@@ -1,0 +1,27 @@
+name: backend_sdk
+description: >-
+  A provider-agnostic backend SDK for Flutter and Dart applications. Ships a
+  typed auth, data, storage, pagination and realtime API that is decoupled from
+  any specific backend vendor, with Supabase as the first reference provider.
+version: 0.1.0
+repository: https://github.com/example/backend_sdk
+issue_tracker: https://github.com/example/backend_sdk/issues
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  collection: ^1.19.0
+  flutter:
+    sdk: flutter
+  supabase: ^2.6.0
+  supabase_flutter: ^2.6.0
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+  test: ^1.25.0
+
+flutter:

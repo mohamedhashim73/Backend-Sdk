@@ -1,0 +1,22 @@
+name: backend_sdk_example
+description: A runnable Flutter application demonstrating backend_sdk.
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  backend_sdk:
+    path: ../
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

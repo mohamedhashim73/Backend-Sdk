@@ -1,0 +1,48 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # Documentation is mandatory for every public API in this package.
+    public_member_api_docs: error
+    # Unawaited futures and missing awaits are real defects here.
+    unawaited_futures: error
+    # Silent catches are forbidden by the package code-quality rules.
+    empty_catches: error
+    todo: warning
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - build/**
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - avoid_empty_else
+    - avoid_print
+    - avoid_relative_lib_imports
+    - avoid_slow_async_io
+    - avoid_type_to_string
+    - avoid_types_as_parameter_names
+    - await_only_futures
+    - cancel_subscriptions
+    - comment_references
+    - directives_ordering
+    - implicit_call_tearoffs
+    - only_throw_errors
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_final_locals
+    - prefer_single_quotes
+    - sort_pub_dependencies
+    - test_types_in_equals
+    - throw_in_finally
+    - unawaited_futures
+    - unnecessary_await_in_return
+    - unnecessary_parenthesis
+    - unnecessary_statements
+    - use_super_parameters

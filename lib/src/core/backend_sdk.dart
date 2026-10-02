@@ -1,0 +1,386 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:developer' as developer;
+
+import '../auth/auth_repository.dart';
+import '../errors/backend_error_mapper.dart';
+import '../errors/backend_error_type.dart';
+import '../errors/backend_failure.dart';
+import '../modules/products/products_repository.dart';
+import '../modules/users/users_repository.dart';
+import '../providers/supabase/supabase_provider.dart';
+import '../realtime/realtime_repository.dart';
+import '../storage/storage_repository.dart';
+import 'backend_configuration.dart';
+import 'backend_logger.dart';
+import 'backend_provider.dart';
+import 'dependency_container.dart';
+
+/// The entry point of the backend SDK.
+///
+/// `BackendSdk` is a thin, typed facade over whichever provider is configured.
+/// It owns the initialization lifecycle and hands out repositories; it contains
+/// no data-access logic of its own.
+///
+/// ## Lifecycle
+///
+/// Initialization happens **exactly once** per process:
+///
+/// ```dart
+/// void main() async {
+///   WidgetsFlutterBinding.ensureInitialized();
+///   await BackendSdk.initialize(
+///     provider: BackendProvider.supabase,
+///     configuration: BackendConfiguration.supabase(
+///       url: AppEnvironment.supabaseUrl,
+///       apiKey: AppEnvironment.supabaseAnonKey,
+///     ),
+///   );
+///   runApp(const MyApp());
+/// }
+/// ```
+///
+/// * [initialize] validates the configuration before touching the network.
+/// * Calling [initialize] again while an instance is active is a **no-op that
+///   throws**: the active provider is never silently replaced, because two
+///   different configurations silently swapping underneath live screens is a
+///   class of bug that is very hard to diagnose.
+/// * Accessing a repository before initialization throws a
+///   `BackendErrorType.configuration` failure rather than a null dereference.
+///
+/// ## Secrets
+///
+/// Configuration carries the provider's **public** key. Never put a
+/// service-role or secret key in a Flutter application: the binary is readable
+/// by its users, and every table must be protected by row level security
+/// instead.
+class BackendSdk {
+  BackendSdk._();
+
+  static final BackendSdk _instance = BackendSdk._();
+
+  /// The process-wide SDK instance.
+  ///
+  /// Reading this getter registers the providers that ship with the package, so
+  /// the first `BackendSdk.instance` access is enough to make
+  /// [initialize] work without any wiring in the application.
+  static BackendSdk get instance {
+    registerDefaultProviders();
+    return _instance;
+  }
+
+  static BackendServices? _services;
+  static BackendConfiguration? _configuration;
+  static Future<void>? _initialization;
+
+  /// The configuration the active provider was built with, or `null` before
+  /// initialization.
+  static BackendConfiguration? get configuration => _configuration;
+
+  /// Whether [initialize] has completed and services are available.
+  bool get isInitialized => _services != null;
+
+  /// Initializes the SDK.
+  ///
+  /// [provider] selects the backend. Only [BackendProvider.supabase] ships with
+  /// this package; the others return a clear
+  /// [BackendErrorType.unsupportedProvider] failure unless a factory has been
+  /// registered through `BackendServiceFactory.register`.
+  ///
+  /// [logger] overrides the log sink. Logging is off unless
+  /// [BackendConfiguration.enableLogging] is `true`, and even then every value
+  /// is redacted before it reaches the sink.
+  ///
+  /// Throws a [BackendFailure] with type
+  /// [BackendErrorType.configuration] when the configuration is invalid, and a
+  /// failure of [BackendErrorType.unsupportedProvider] when no factory is
+  /// registered for [provider]. It also throws when the SDK is already
+  /// initialized.
+  static Future<void> initialize({
+    required BackendProvider provider,
+    required BackendConfiguration configuration,
+    BackendLogger? logger,
+  }) {
+    if (_initialization != null) {
+      return Future<void>.error(
+        BackendErrorClassifier.build(
+          type: BackendErrorType.configuration,
+          message: 'BackendSdk.initialize() has already been called. The '
+              'active provider is not replaced; dispose the SDK first if you '
+              'really need to switch backends.',
+        ),
+        StackTrace.current,
+      );
+    }
+
+    // The in-flight future is published *synchronously*, before `_initialize`
+    // runs. Otherwise two concurrent calls could both pass the guard above,
+    // and a failed attempt would leave a stale future that blocks a legitimate
+    // retry.
+    final completer = Completer<void>();
+    _initialization = completer.future;
+
+    _initialize(
+      provider: provider,
+      configuration: configuration,
+      logger: logger,
+    ).then(
+      completer.complete,
+      onError: (Object error, StackTrace stackTrace) {
+        // Clearing the marker is what allows a corrected configuration to be
+        // retried after a failed attempt.
+        _initialization = null;
+        completer.completeError(error, stackTrace);
+      },
+    );
+
+    return completer.future;
+  }
+
+  static Future<void> _initialize({
+    required BackendProvider provider,
+    required BackendConfiguration configuration,
+    BackendLogger? logger,
+  }) async {
+    final validation = validateConfiguration(provider, configuration);
+    if (validation != null) {
+      throw validation;
+    }
+
+    final effectiveLogger = _resolveLogger(configuration, logger);
+    final factory = BackendServiceFactory.of(provider);
+    if (factory == null) {
+      final failure = UnsupportedProviderFailure(provider).error;
+      effectiveLogger.warn(
+        'The selected backend provider is not implemented.',
+        context: {'provider': provider.name},
+      );
+      throw failure;
+    }
+
+    try {
+      final services = await factory(configuration, effectiveLogger);
+      _services = services;
+      _configuration = configuration;
+      effectiveLogger.info(
+        'Backend SDK initialized.',
+        context: {'provider': provider.name},
+      );
+    } on BackendFailure {
+      rethrow;
+    } on Object catch (error, stackTrace) {
+      final failure = BackendErrorClassifier.fromException(
+        error,
+        stackTrace,
+        fallbackType: BackendErrorType.configuration,
+      );
+      effectiveLogger.error(
+        'Initializing the backend SDK failed.',
+        cause: error,
+        stackTrace: stackTrace,
+        context: {'provider': provider.name},
+      );
+      throw failure;
+    }
+  }
+
+  /// Validates [configuration] for [provider].
+  ///
+  /// Returns `null` when the configuration is usable, otherwise a
+  /// [BackendErrorType.configuration] failure describing the first problem
+  /// found. Exposed so an application can validate a configuration at start-up
+  /// and surface its own diagnostics.
+  static BackendFailure? validateConfiguration(
+    BackendProvider provider,
+    BackendConfiguration configuration,
+  ) {
+    if (configuration.provider != provider) {
+      return _configurationFailure(
+        'The provider argument (${provider.name}) does not match the '
+        'configuration provider (${configuration.provider.name}).',
+      );
+    }
+    final url = configuration.url;
+    if (url == null || url.trim().isEmpty) {
+      return _configurationFailure(
+        'A backend URL is required. Pass it at build time, for example with '
+        'String.fromEnvironment, and never hardcode it.',
+      );
+    }
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+      return _configurationFailure(
+        'The backend URL must be an absolute http(s) URL.',
+      );
+    }
+    if (uri.scheme != 'https' && uri.scheme != 'http') {
+      return _configurationFailure('The backend URL must use http or https.');
+    }
+    if (uri.hasQuery || uri.hasFragment) {
+      return _configurationFailure(
+        'The backend URL must not contain a query string or fragment.',
+      );
+    }
+
+    final apiKey = configuration.apiKey;
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      return _configurationFailure(
+        'A backend API key is required. Use the provider anon/publishable key, '
+        'never a service-role or secret key.',
+      );
+    }
+    if (_looksLikeServiceRoleKey(apiKey)) {
+      return _configurationFailure(
+        'The supplied API key looks like a Supabase service-role (secret) key. '
+        'A service-role key must never ship inside a Flutter application; use '
+        'the anon/publishable key and enforce access with row level security.',
+      );
+    }
+
+    if (configuration.requestTimeout <= Duration.zero) {
+      return _configurationFailure('The request timeout must be positive.');
+    }
+    if (configuration.maxRetries < 0) {
+      return _configurationFailure('maxRetries must not be negative.');
+    }
+    if (configuration.maxRetries > 10) {
+      return _configurationFailure(
+        'maxRetries must not exceed 10; a larger value amplifies load without '
+        'improving reliability.',
+      );
+    }
+    if (configuration.retryBackoffMultiplier < 1) {
+      return _configurationFailure(
+        'The retry backoff multiplier must be at least 1.',
+      );
+    }
+    return null;
+  }
+
+  /// Detects a Supabase service-role key.
+  ///
+  /// A service-role key is a JWT whose payload is `{"role":"service_role"}`.
+  /// This is a defence-in-depth check: it catches the most common mistake
+  /// (pasting the wrong key from the dashboard) before it is shipped, while
+  /// still allowing a publishable key, which is not a JWT.
+  static bool _looksLikeServiceRoleKey(String apiKey) {
+    final parts = apiKey.split('.');
+    if (parts.length != 3) return false;
+    final payload = parts.elementAtOrNull(1);
+    if (payload == null || payload.isEmpty) return false;
+
+    // The payload is base64url-encoded JSON, so the role has to be decoded
+    // rather than pattern-matched.
+    try {
+      final normalized = base64Url.normalize(payload);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      return decoded.contains('service_role');
+    } on FormatException {
+      // Not decodable: fall back to a textual check, which still catches the
+      // common case of a truncated or pasted key.
+      return payload.contains('service_role');
+    }
+  }
+
+  /// Releases the active provider and resets the SDK so it can be initialized
+  /// again.
+  ///
+  /// Intended for tests and for a deliberate backend switch. Safe to call when
+  /// the SDK was never initialized.
+  static Future<void> dispose() async {
+    final services = _services;
+    _services = null;
+    _configuration = null;
+    _initialization = null;
+    await services?.dispose();
+  }
+
+  /// Clears the singleton state without disposing the provider.
+  ///
+  /// Intended for tests only. Prefer [dispose].
+  static void resetForTesting() {
+    _services = null;
+    _configuration = null;
+    _initialization = null;
+  }
+
+  /// Authentication.
+  AuthRepository get auth => _require('auth').auth;
+
+  /// File storage.
+  StorageRepository get storage => _require('storage').storage;
+
+  /// Realtime change subscriptions.
+  RealtimeRepository get realtime => _require('realtime').realtime;
+
+  /// The products module.
+  ProductsRepository get products => _require('products').products;
+
+  /// The users module.
+  UsersRepository get users => _require('users').users;
+
+  BackendServices _require(String member) {
+    final services = _services;
+    if (services == null) {
+      throw _configurationFailure(
+        'BackendSdk.$member was accessed before initialization. Await '
+        'BackendSdk.initialize() during start-up.',
+      );
+    }
+    return services;
+  }
+
+  static BackendFailure _configurationFailure(String message) {
+    return BackendErrorClassifier.build(
+      type: BackendErrorType.configuration,
+      message: message,
+    );
+  }
+
+  static BackendLogger _resolveLogger(
+    BackendConfiguration configuration,
+    BackendLogger? logger,
+  ) {
+    if (logger != null) return logger;
+    if (!configuration.enableLogging) return const NoopBackendLogger();
+    return const CallbackBackendLogger(
+      sink: _writeToDeveloperLog,
+      // Debug entries are noisy in production; info, warning and error are not.
+      isDebug: false,
+    );
+  }
+}
+
+/// The default log sink, writing through `dart:developer`.
+///
+/// Entries appear in `flutter logs` and in the DevTools console. Values in the
+/// entry have already been redacted by `CallbackBackendLogger`, so no secret
+/// can reach this function.
+void _writeToDeveloperLog(LogEntry entry) {
+  developer.log(
+    entry.toString(),
+    name: 'backend_sdk',
+    level: switch (entry.level) {
+      LogLevel.debug => 500,
+      LogLevel.info => 800,
+      LogLevel.warning => 900,
+      LogLevel.error => 1000,
+    },
+    error: entry.cause,
+    stackTrace: entry.stackTrace,
+  );
+}
+
+/// Registers the Supabase provider with the SDK.
+///
+/// Called from `BackendSdk`'s static initializer the first time the singleton is
+/// created, so an application never has to wire the provider itself.
+void registerDefaultProviders() {
+  BackendServiceFactory.register(
+    BackendProvider.supabase,
+    (configuration, logger) => SupabaseProvider.create(
+      configuration: configuration,
+      logger: logger,
+    ),
+  );
+}
