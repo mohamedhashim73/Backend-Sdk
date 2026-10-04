@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import '../auth/auth_repository.dart';
+import '../contracts/data_backend.dart';
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
 import '../errors/backend_failure.dart';
@@ -336,6 +337,9 @@ class BackendSdk {
     _configuration = null;
     _initialization = null;
   }
+
+  /// Authentication.
+  DataBackend get data => _require('data').data;
 
   /// Authentication.
   AuthRepository get auth => _require('auth').auth;

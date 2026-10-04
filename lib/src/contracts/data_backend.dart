@@ -1,4 +1,7 @@
 import '../core/backend_resource.dart';
+import '../core/resource_codec.dart';
+import '../errors/backend_error_mapper.dart';
+import '../errors/backend_error_type.dart';
 import '../pagination/cursor_page_result.dart';
 import '../pagination/page_result.dart';
 import '../result/backend_result.dart';
@@ -79,6 +82,189 @@ abstract interface class DataBackend {
   /// Counts the records of [resource] matching [spec]'s filters and search.
   Future<BackendResult<int>> countRecords({
     required BackendResource resource,
+    required DataQuerySpec spec,
+  });
+}
+
+/// Descriptor-based operations available to all data backends.
+///
+/// Kept as extensions for source compatibility with providers implementing the
+/// original enum-based contract. Providers that support application modules may
+/// override these members with concrete methods; such methods take precedence
+/// over the extensions.
+extension DescriptorDataBackendExtension on DataBackend {
+  Future<BackendResult<PageResult<BackendRecord>>> getPage({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  }) {
+    if (this is DescriptorDataBackend) {
+      return (this as DescriptorDataBackend).getPage(
+        resource: resource,
+        spec: spec,
+      );
+    }
+    final legacy = resource.resource;
+    if (legacy == null) return _unsupported<PageResult<BackendRecord>>(resource);
+    return readPage(resource: legacy, spec: spec);
+  }
+
+  Future<BackendResult<CursorPageResult<BackendRecord>>> getCursorPage({
+    required BackendResourceDescriptor resource,
+    required String? cursor,
+    required DataQuerySpec spec,
+  }) {
+    if (this is DescriptorDataBackend) {
+      return (this as DescriptorDataBackend).getCursorPage(
+        resource: resource,
+        cursor: cursor,
+        spec: spec,
+      );
+    }
+    final legacy = resource.resource;
+    if (legacy == null) {
+      return _unsupported<CursorPageResult<BackendRecord>>(resource);
+    }
+    return readCursorPage(resource: legacy, cursor: cursor, spec: spec);
+  }
+
+  Future<BackendResult<BackendRecord>> getById({
+    required BackendResourceDescriptor resource,
+    required String id,
+  }) {
+    if (this is DescriptorDataBackend) {
+      return (this as DescriptorDataBackend).getById(resource: resource, id: id);
+    }
+    final legacy = resource.resource;
+    if (legacy == null) return _unsupported<BackendRecord>(resource);
+    return readById(resource: legacy, id: id);
+  }
+
+  Future<BackendResult<BackendRecord>> create({
+    required BackendResourceDescriptor resource,
+    required Map<String, Object?> values,
+  }) {
+    if (this is DescriptorDataBackend) {
+      return (this as DescriptorDataBackend).create(
+        resource: resource,
+        values: values,
+      );
+    }
+    final legacy = resource.resource;
+    if (legacy == null) return _unsupported<BackendRecord>(resource);
+    return insertRecord(resource: legacy, values: values);
+  }
+
+  Future<BackendResult<BackendRecord>> update({
+    required BackendResourceDescriptor resource,
+    required String id,
+    required Map<String, Object?> values,
+  }) {
+    if (this is DescriptorDataBackend) {
+      return (this as DescriptorDataBackend).update(
+        resource: resource,
+        id: id,
+        values: values,
+      );
+    }
+    final legacy = resource.resource;
+    if (legacy == null) return _unsupported<BackendRecord>(resource);
+    return updateRecord(resource: legacy, id: id, values: values);
+  }
+
+  Future<BackendResult<void>> delete({
+    required BackendResourceDescriptor resource,
+    required String id,
+    String? softDeleteColumn,
+    Object? softDeleteValue,
+  }) {
+    if (this is DescriptorDataBackend) {
+      return (this as DescriptorDataBackend).delete(
+        resource: resource,
+        id: id,
+        softDeleteColumn: softDeleteColumn,
+        softDeleteValue: softDeleteValue,
+      );
+    }
+    final legacy = resource.resource;
+    if (legacy == null) return _unsupported<void>(resource);
+    return deleteRecord(
+      resource: legacy,
+      id: id,
+      softDeleteColumn: softDeleteColumn,
+      softDeleteValue: softDeleteValue,
+    );
+  }
+
+  Future<BackendResult<int>> count({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  }) {
+    if (this is DescriptorCountBackend) {
+      return (this as DescriptorCountBackend).count(
+        resource: resource,
+        spec: spec,
+      );
+    }
+    final legacy = resource.resource;
+    if (legacy == null) return _unsupported<int>(resource);
+    return countRecords(resource: legacy, spec: spec);
+  }
+
+  Future<BackendResult<T>> _unsupported<T>(BackendResourceDescriptor resource) {
+    return Future.value(
+      failureOf<T>(
+        BackendErrorClassifier.build(
+          type: BackendErrorType.unsupportedProvider,
+          message: 'The configured data backend does not support '
+              'application-defined resource "${resource.key}".',
+        ),
+      ),
+    );
+  }
+}
+
+/// Optional provider extension implemented by providers that support custom
+/// application-defined descriptors.
+abstract interface class DescriptorDataBackend {
+  Future<BackendResult<PageResult<BackendRecord>>> getPage({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  });
+
+  Future<BackendResult<CursorPageResult<BackendRecord>>> getCursorPage({
+    required BackendResourceDescriptor resource,
+    required String? cursor,
+    required DataQuerySpec spec,
+  });
+
+  Future<BackendResult<BackendRecord>> getById({
+    required BackendResourceDescriptor resource,
+    required String id,
+  });
+
+  Future<BackendResult<BackendRecord>> create({
+    required BackendResourceDescriptor resource,
+    required Map<String, Object?> values,
+  });
+
+  Future<BackendResult<BackendRecord>> update({
+    required BackendResourceDescriptor resource,
+    required String id,
+    required Map<String, Object?> values,
+  });
+
+  Future<BackendResult<void>> delete({
+    required BackendResourceDescriptor resource,
+    required String id,
+    String? softDeleteColumn,
+    Object? softDeleteValue,
+  });
+}
+
+/// Optional descriptor count operation.
+abstract interface class DescriptorCountBackend {
+  Future<BackendResult<int>> count({
+    required BackendResourceDescriptor resource,
     required DataQuerySpec spec,
   });
 }

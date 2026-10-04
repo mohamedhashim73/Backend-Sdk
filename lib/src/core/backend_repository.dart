@@ -56,13 +56,24 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     required this.executor,
     this.logger = const NoopBackendLogger(),
     DateTime Function()? clock,
-  }) : clock = clock ?? DateTime.now;
+  }) : clock = clock ?? DateTime.now {
+    descriptor.validate();
+  }
 
   /// Returns the current UTC time, used as the soft-delete marker.
   DateTime now() => clock().toUtc();
 
   /// The resource this repository operates on.
-  BackendResource get resource => codec.descriptor.resource;
+  BackendResourceDescriptor get descriptor => codec.descriptor;
+
+  /// The legacy built-in resource, when one exists.
+  BackendResource get resource => descriptor.resource ??
+      (throw StateError(
+        'Application-defined repositories use descriptor, not the legacy '
+        'BackendResource enum.',
+      ));
+
+  String get resourceKey => descriptor.key;
 
   /// Reads a single record by primary key.
   ///
@@ -78,11 +89,11 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     }
 
     final result = await executor.run<BackendRecord>(
-      operation: '${resource.name}.getById',
+      operation: '$resourceKey.getById',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
-        await backend.readById(resource: resource, id: id.trim()),
+        await backend.getById(resource: descriptor, id: id.trim()),
       ),
     );
 
@@ -104,16 +115,16 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
       return failureOf(invalid);
     }
 
-    final key = '${resource.name}#${request.cacheKey}';
+    final key = '$resourceKey#${request.cacheKey}';
     if (!_inFlightPages.add(key)) {
       logger.debug(
         'Skipping a duplicate in-flight page load.',
-        context: {'resource': resource.name, 'page': request.page},
+        context: {'resource': resourceKey, 'page': request.page},
       );
       return failureOf(
         BackendErrorClassifier.build(
           type: BackendErrorType.conflict,
-          message: 'Page ${request.page} of ${resource.name} is already being '
+          message: 'Page ${request.page} of $resourceKey is already being '
               'loaded. Await the in-flight request before requesting it again.',
         ),
       );
@@ -122,11 +133,11 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     try {
       final spec = _buildSpec(request);
       final result = await executor.run<PageResult<BackendRecord>>(
-        operation: '${resource.name}.getPage',
+        operation: '$resourceKey.getPage',
         fallbackErrorType: BackendErrorType.database,
         cancellationToken: cancellationToken,
         action: () async =>
-            unwrap(await backend.readPage(resource: resource, spec: spec)),
+            unwrap(await backend.getPage(resource: descriptor, spec: spec)),
       );
 
       return result.map((page) {
@@ -137,7 +148,7 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
           if (failure != null) {
             logger.warn(
               'Skipping an undecodable record.',
-              context: {'resource': resource.name, 'reason': failure.message},
+              context: {'resource': resourceKey, 'reason': failure.message},
             );
             continue;
           }
@@ -181,12 +192,12 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     );
 
     final result = await executor.run<CursorPageResult<BackendRecord>>(
-      operation: '${resource.name}.getCursorPage',
+        operation: '$resourceKey.getCursorPage',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
-        await backend.readCursorPage(
-          resource: resource,
+          await backend.getCursorPage(
+            resource: descriptor,
           cursor: request.cursor,
           spec: spec,
         ),
@@ -232,11 +243,11 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     );
 
     return executor.run<int>(
-      operation: '${resource.name}.count',
+      operation: '$resourceKey.count',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async =>
-          unwrap(await backend.countRecords(resource: resource, spec: spec)),
+          unwrap(await backend.count(resource: descriptor, spec: spec)),
     );
   }
 
@@ -263,11 +274,11 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     }
 
     final result = await executor.run<BackendRecord>(
-      operation: '${resource.name}.create',
+      operation: '$resourceKey.create',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
-        await backend.insertRecord(resource: resource, values: values),
+        await backend.create(resource: descriptor, values: values),
       ),
     );
 
@@ -303,12 +314,12 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     }
 
     final result = await executor.run<BackendRecord>(
-      operation: '${resource.name}.update',
+      operation: '$resourceKey.update',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
-        await backend.updateRecord(
-          resource: resource,
+        await backend.update(
+          resource: descriptor,
           id: id.trim(),
           values: values,
         ),
@@ -332,11 +343,11 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     }
 
     return executor.run<void>(
-      operation: '${resource.name}.delete',
+      operation: '$resourceKey.delete',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
-        await backend.deleteRecord(resource: resource, id: id.trim()),
+        await backend.delete(resource: descriptor, id: id.trim()),
       ),
     );
   }
@@ -354,7 +365,7 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     if (softDeleteField == null) {
       return failureOf(
         _validation(
-          '${resource.name} does not support soft deletion. Call delete() if '
+          '$resourceKey does not support soft deletion. Call delete() if '
           'you intend to remove the record permanently.',
         ),
       );
@@ -364,12 +375,12 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     }
 
     final result = await executor.run<BackendRecord>(
-      operation: '${resource.name}.softDelete',
+      operation: '$resourceKey.softDelete',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
-        await backend.updateRecord(
-          resource: resource,
+        await backend.update(
+          resource: descriptor,
           id: id.trim(),
           values: <String, Object?>{softDeleteField: now()},
         ),
@@ -381,7 +392,7 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
 
   /// Whether a page identified by [request] is currently being loaded.
   bool isPageInFlight(PageRequest request) =>
-      _inFlightPages.contains('${resource.name}#${request.cacheKey}');
+      _inFlightPages.contains('$resourceKey#${request.cacheKey}');
 
   DataQuerySpec _buildSpec(PageRequest request) {
     // A soft-delete column, when present, is always hidden from reads so a
@@ -450,7 +461,7 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
       return failureOf(
         BackendErrorClassifier.build(
           type: BackendErrorType.notFound,
-          message: 'No ${resource.name} record was found for the requested id.',
+          message: 'No $resourceKey record was found for the requested id.',
         ),
       );
     }

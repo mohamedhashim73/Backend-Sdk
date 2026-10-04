@@ -41,7 +41,7 @@ result.when(
 - [Retry and timeout behaviour](#retry-and-timeout-behaviour)
 - [Testing](#testing)
 - [Security and RLS](#security-and-rls)
-- [Adding a new module](#adding-a-new-module)
+- [Adding an application-defined module](#adding-an-application-defined-module)
 - [Adding a new backend provider](#adding-a-new-backend-provider)
 - [Versioning and backward compatibility](#versioning-and-backward-compatibility)
 - [Complete usage example](#complete-usage-example)
@@ -1043,86 +1043,94 @@ delete from public.products where id = '...';
 
 ---
 
-## Adding a new module
+## Adding an application-defined module
 
-A module is a folder under `lib/src/modules/` plus one enum value. Nothing
-outside the package changes.
+Application modules live in the consuming Flutter application. They do not
+require a new `BackendResource` enum value, a change to this package, a second
+`SupabaseClient`, or a raw Supabase query.
 
-1. **Add the resource** to `BackendResource` in `lib/src/core/backend_resource.dart`.
-
-2. **Create the column contract** — `orders/columns.dart`:
+1. Initialize `backend_sdk` once and obtain `BackendSdk.instance.data`.
+2. Declare a static, validated descriptor with an application-owned key and
+   table name:
 
 ```dart
-abstract final class OrderColumns {
-  static const id = 'id';
-  static const reference = 'reference';
-  static const total = 'total';
-  static const status = 'status';
-  static const createdAt = 'created_at';
-  static const deletedAt = 'deleted_at';
-
-  static const List<String> searchable = <String>[reference, status];
+abstract final class HistoricalNarrativeResource {
+  static const descriptor = BackendResourceDescriptor(
+    key: 'historical_narratives',
+    tableName: 'historical_narratives',
+    searchableFields: {'title', 'description'},
+    defaultSorting: [SortCondition.descending('published_at')],
+  );
 }
 ```
 
-3. **Create the model** — `orders/order_model.dart`. An immutable class with
-   `copyWith`, `==`, `hashCode` and a `toString` that carries no secrets.
-
-4. **Create the requests** — `orders/order_requests.dart`. Public final fields,
-   `const` constructors. This is what keeps raw column maps out of the API.
-
-5. **Create the codec** — `orders/order_codec.dart`. Implement
-   `ResourceCodec<Order, CreateOrderRequest, UpdateOrderRequest>`:
+3. Create the application model and codec. The codec is the only application
+   code that knows the row shape:
 
 ```dart
-class OrderCodec implements ResourceCodec<Order, CreateOrderRequest, UpdateOrderRequest> {
-  const OrderCodec();
+class HistoricalNarrativeCodec implements ResourceCodec<HistoricalNarrative,
+    Map<String, Object?>, Map<String, Object?>> {
+  const HistoricalNarrativeCodec();
 
   @override
-  BackendResourceDescriptor get descriptor => const BackendResourceDescriptor(
-        resource: BackendResource.orders,
-        primaryKeyField: OrderColumns.id,
-        searchableFields: OrderColumns.searchable,
-        defaultSorting: <SortCondition>[
-          SortCondition.descending(OrderColumns.createdAt),
-        ],
-        softDeleteField: OrderColumns.deletedAt,
-      );
+  BackendResourceDescriptor get descriptor =>
+      HistoricalNarrativeResource.descriptor;
 
   @override
-  BackendResult<Order> decode(BackendRecord record) { /* ... */ }
+  BackendResult<HistoricalNarrative> decode(BackendRecord record) =>
+      BackendSuccess(HistoricalNarrative.fromBackend(record));
 
   @override
-  BackendResult<Map<String, Object?>> encodeCreate(CreateOrderRequest r) { /* ... */ }
+  BackendResult<Map<String, Object?>> encodeCreate(Map<String, Object?> value) =>
+      BackendSuccess(value);
 
   @override
-  BackendResult<Map<String, Object?>> encodeUpdate(UpdateOrderRequest r) { /* ... */ }
+  BackendResult<Map<String, Object?>> encodeUpdate(Map<String, Object?> value) =>
+      BackendSuccess(value);
 
   @override
-  BackendFailure? validateCreate(CreateOrderRequest r) { /* ... */ }
+  BackendFailure? validateCreate(Map<String, Object?> value) => null;
 
   @override
-  BackendFailure? validateUpdate(UpdateOrderRequest r) { /* ... */ }
+  BackendFailure? validateUpdate(Map<String, Object?> value) => null;
 }
 ```
 
-6. **Create the repository** — `orders/orders_repository.dart`. Delegate to
-   `BackendRepository`; you do not write pagination, filtering, ordering or
-   soft-delete logic.
+4. Create a repository in the application:
 
-7. **Map the resource to a table** in
-   `lib/src/providers/supabase/supabase_mappers.dart`
-   (`SupabaseResourceRegistry.tableOf`) and add the searchable columns in
-   `SupabaseProvider._searchableColumns`.
+```dart
+class HistoricalNarrativesRepository extends BackendRepository<
+    HistoricalNarrative, Map<String, Object?>, Map<String, Object?>> {
+  HistoricalNarrativesRepository({
+    required DataBackend backend,
+    required RequestExecutor executor,
+  }) : super(
+          backend: backend,
+          executor: executor,
+          codec: const HistoricalNarrativeCodec(),
+        );
+}
 
-8. **Expose it** from `BackendServices` / `SupabaseProvider` and from
-   `BackendSdk`, then export the new files from `lib/backend_sdk.dart`.
+final result = await repository.getPage(
+  request: const PageRequest(
+    page: 1,
+    pageSize: 20,
+    search: 'museum',
+    sorting: [SortCondition.descending('published_at')],
+  ),
+);
+final narratives = result.map(
+  (page) => page.mapItems(HistoricalNarrative.fromBackend),
+);
+```
 
-9. **Add the SQL** for the table plus its RLS policies, following
-   `0002_rls_policies.sql`.
+5. A `RemoteDataSource` or Cubit can depend on this repository and handle the
+   returned `BackendResult`; no provider types cross the boundary.
 
-10. **Add the tests**: codec decode/encode/validate, repository CRUD, pagination,
-    and one end-to-end realtime case.
+Descriptor keys, table names and field names must be static safe identifiers;
+they are never received from end users and never contain SQL or query
+fragments. Keep RLS enabled and enforced by Supabase. Future modules such as
+orders, vehicles, podcasts or invoices follow the same application-only flow.
 
 ---
 

@@ -44,8 +44,15 @@ abstract interface class ResourceCodec<TModel extends Object,
 
 /// The provider-independent description of a resource a codec handles.
 class BackendResourceDescriptor {
-  /// The resource this descriptor identifies.
-  final BackendResource resource;
+  /// The legacy built-in resource, when this descriptor represents Products or
+  /// Users. Application-defined descriptors leave this `null`.
+  final BackendResource? resource;
+
+  /// A stable application-level key for this resource.
+  final String key;
+
+  /// The validated physical table/collection name used by the provider.
+  final String tableName;
 
   /// The primary key column name.
   ///
@@ -54,7 +61,7 @@ class BackendResourceDescriptor {
   final String primaryKeyField;
 
   /// The columns a free-text search term is matched against.
-  final List<String> searchableFields;
+  final Iterable<String> searchableFields;
 
   /// The columns the resource is ordered by when a request supplies no sorting.
   final List<SortCondition> defaultSorting;
@@ -71,14 +78,53 @@ class BackendResourceDescriptor {
 
   /// Creates a resource descriptor.
   const BackendResourceDescriptor({
-    required this.resource,
-    required this.primaryKeyField,
-    this.searchableFields = const [],
+    this.resource,
+    String? key,
+    String? tableName,
+    this.primaryKeyField = 'id',
+    Iterable<String> searchableFields = const <String>{},
     this.defaultSorting = const [],
     this.softDeleteField,
     this.createdAtField,
     this.updatedAtField,
-  });
+  })  : key = key ?? (resource == BackendResource.products
+            ? 'products'
+            : resource == BackendResource.users
+                ? 'users'
+                : ''),
+        tableName = tableName ?? (resource == BackendResource.products
+            ? 'products'
+            : resource == BackendResource.users
+                ? 'users'
+                : ''),
+        searchableFields = searchableFields;
+
+  /// Whether this descriptor contains only safe identifier names.
+  bool get isValid {
+    return _isIdentifier(key) &&
+        _isIdentifier(tableName) &&
+        _isIdentifier(primaryKeyField) &&
+        searchableFields.every(_isIdentifier) &&
+        defaultSorting.every((sort) => _isIdentifier(sort.field)) &&
+        (softDeleteField == null || _isIdentifier(softDeleteField!)) &&
+        (createdAtField == null || _isIdentifier(createdAtField!)) &&
+        (updatedAtField == null || _isIdentifier(updatedAtField!));
+  }
+
+  /// Throws an [ArgumentError] when the descriptor is unsafe or incomplete.
+  void validate() {
+    if (!isValid) {
+      throw ArgumentError.value(
+        this,
+        'descriptor',
+        'Resource keys, table names and field names must be non-empty safe '
+            'identifiers containing only letters, digits and underscores.',
+      );
+    }
+  }
+
+  static bool _isIdentifier(String value) =>
+      RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(value);
 
   /// Whether this resource supports soft deletion.
   bool get supportsSoftDelete => softDeleteField != null;

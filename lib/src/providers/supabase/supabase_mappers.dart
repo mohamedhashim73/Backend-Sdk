@@ -30,12 +30,7 @@ class SupabaseResourceRegistry {
   ///
   /// Throws a [StateError] for a resource this provider does not serve, which
   /// can only happen if the enum and this registry drift apart.
-  static String tableOf(BackendResource resource) {
-    return switch (resource) {
-      BackendResource.products => 'products',
-      BackendResource.users => 'users',
-    };
-  }
+  static String tableOf(BackendResource resource) => resource.name;
 }
 
 /// Converts Supabase auth and realtime types into the SDK's own types.

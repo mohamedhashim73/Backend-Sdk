@@ -12,6 +12,7 @@ import 'package:supabase/supabase.dart'
 import '../../contracts/data_backend.dart';
 import '../../contracts/data_query_spec.dart';
 import '../../core/backend_resource.dart';
+import '../../core/resource_codec.dart';
 import '../../errors/backend_error_mapper.dart';
 import '../../errors/backend_error_type.dart';
 import '../../errors/backend_failure.dart';
@@ -34,7 +35,8 @@ import 'supabase_mappers.dart';
 /// `RequestExecutor` above already implements bounded exponential backoff with
 /// jitter, and a second retry layer would multiply the attempts and defeat the
 /// SDK-wide retry budget.
-class SupabaseDataBackend implements DataBackend {
+class SupabaseDataBackend
+    implements DataBackend, DescriptorDataBackend, DescriptorCountBackend {
   final SupabaseClient _client;
   final SupabaseErrorMapper _errorMapper;
 
@@ -55,6 +57,146 @@ class SupabaseDataBackend implements DataBackend {
         _searchableColumns = Map<BackendResource, List<String>>.unmodifiable(
           searchableColumns,
         );
+
+  @override
+  Future<BackendResult<PageResult<BackendRecord>>> getPage({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  }) {
+    return _guard('getPage', () async {
+      resource.validate();
+      final filtered = _applySearchDescriptor(
+        _applyFilters(_selectDescriptor(resource), spec),
+        spec,
+        resource,
+      );
+      final ranged = _applySorting(filtered, spec).range(spec.from, spec.to);
+      if (spec.includeTotalCount) {
+        final response = await ranged.count(CountOption.exact);
+        return PageResult<BackendRecord>.fromItems(
+          items: _records(response.data),
+          page: (spec.from ~/ (spec.to - spec.from + 1)) + 1,
+          pageSize: spec.to - spec.from + 1,
+          totalCount: response.count,
+        );
+      }
+      return PageResult<BackendRecord>.fromItems(
+        items: _records(await ranged),
+        page: (spec.from ~/ (spec.to - spec.from + 1)) + 1,
+        pageSize: spec.to - spec.from + 1,
+      );
+    });
+  }
+
+  @override
+  Future<BackendResult<CursorPageResult<BackendRecord>>> getCursorPage({
+    required BackendResourceDescriptor resource,
+    required String? cursor,
+    required DataQuerySpec spec,
+  }) {
+    return _guard('getCursorPage', () async {
+      resource.validate();
+      final keyset = cursor == null ? null : _decodeCursor(cursor);
+      if (cursor != null && keyset == null) {
+        throw BackendErrorClassifier.build(
+          type: BackendErrorType.validation,
+          message: 'The pagination cursor is malformed.',
+        );
+      }
+      final base = _applyFilters(_selectDescriptor(resource), spec);
+      final filtered = _applySearchDescriptor(
+        keyset == null ? base : _applyKeyset(base, spec, keyset),
+        spec,
+        resource,
+      );
+      final records = _records(
+        await _applySorting(filtered, spec).range(spec.from, spec.to + 1),
+      );
+      final hasMore = records.length > spec.limit;
+      final items = hasMore ? records.sublist(0, spec.limit) : records;
+      return CursorPageResult<BackendRecord>(
+        items: List<BackendRecord>.unmodifiable(items),
+        nextCursor: hasMore && items.isNotEmpty
+            ? _encodeCursor(items.last, spec.sorting)
+            : null,
+        hasMore: hasMore,
+      );
+    });
+  }
+
+  @override
+  Future<BackendResult<BackendRecord>> getById({
+    required BackendResourceDescriptor resource,
+    required String id,
+  }) => _guard('getById', () async => _client
+      .from(_table(resource))
+      .select('*')
+      .eq(resource.primaryKeyField, id)
+      .limit(1)
+      .single());
+
+  @override
+  Future<BackendResult<BackendRecord>> create({
+    required BackendResourceDescriptor resource,
+    required Map<String, Object?> values,
+  }) => _guard('create', () async => _client
+      .from(_table(resource))
+      .insert(values)
+      .select('*')
+      .single());
+
+  @override
+  Future<BackendResult<BackendRecord>> update({
+    required BackendResourceDescriptor resource,
+    required String id,
+    required Map<String, Object?> values,
+  }) => _guard('update', () async => _client
+      .from(_table(resource))
+      .update(values)
+      .eq(resource.primaryKeyField, id)
+      .select('*')
+      .single());
+
+  @override
+  Future<BackendResult<void>> delete({
+    required BackendResourceDescriptor resource,
+    required String id,
+    String? softDeleteColumn,
+    Object? softDeleteValue,
+  }) => _guard<void>('delete', () async {
+    final table = _client.from(_table(resource));
+    if (softDeleteColumn != null) {
+      final record = await table
+          .update(<String, Object?>{
+            softDeleteColumn:
+                softDeleteValue ?? DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq(resource.primaryKeyField, id)
+          .select('*')
+          .single();
+      return _void(record);
+    }
+    return _void(await table
+        .delete()
+        .eq(resource.primaryKeyField, id)
+        .select(resource.primaryKeyField)
+        .single());
+  });
+
+  @override
+  Future<BackendResult<int>> count({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  }) => _guard<int>('count', () async {
+    resource.validate();
+    final filtered = _applySearchDescriptor(
+      _applyFilters(_selectDescriptor(resource), spec),
+      spec,
+      resource,
+    );
+    final response = await filtered.range(0, 0).count(CountOption.exact);
+    return response.count;
+  });
 
   @override
   Future<BackendResult<PageResult<BackendRecord>>> readPage({
@@ -309,6 +451,32 @@ class SupabaseDataBackend implements DataBackend {
 
   PostgrestFilterBuilder<PostgrestList> _select(BackendResource resource) {
     return _client.from(SupabaseResourceRegistry.tableOf(resource)).select('*');
+  }
+
+  PostgrestFilterBuilder<PostgrestList> _selectDescriptor(
+    BackendResourceDescriptor resource,
+  ) {
+    return _client.from(_table(resource)).select('*');
+  }
+
+  String _table(BackendResourceDescriptor resource) {
+    resource.validate();
+    return resource.tableName;
+  }
+
+  PostgrestFilterBuilder<PostgrestList> _applySearchDescriptor(
+    PostgrestFilterBuilder<PostgrestList> query,
+    DataQuerySpec spec,
+    BackendResourceDescriptor resource,
+  ) {
+    final term = spec.search?.trim() ?? '';
+    if (term.isEmpty || resource.searchableFields.isEmpty) return query;
+    final needle = _sanitizeSearchTerm(term);
+    if (needle.isEmpty) return query;
+    final clause = resource.searchableFields
+        .map((column) => '$column.ilike.*$needle*')
+        .join(',');
+    return query.or(clause);
   }
 
   PostgrestTransformBuilder<PostgrestList> _applySorting(

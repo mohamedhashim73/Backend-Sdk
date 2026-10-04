@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../auth/auth_repository.dart';
+import '../contracts/data_backend.dart';
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
 import '../errors/backend_failure.dart';
@@ -18,6 +19,9 @@ import 'backend_provider.dart';
 /// types, which is why a REST or Firebase provider can be added later without
 /// changing the facade or any application code.
 abstract interface class BackendServices {
+  /// Provider-agnostic CRUD and pagination backend for application modules.
+  DataBackend get data;
+
   /// Authentication.
   AuthRepository get auth;
 
@@ -89,6 +93,7 @@ typedef BackendServiceFactoryEntry = FutureOr<BackendServices> Function(
 
 /// A [BackendServices] implementation backed by a provider-specific container.
 class ProviderBackendServices implements BackendServices {
+  final DataBackend _data;
   final AuthRepository _auth;
   final StorageRepository _storage;
   final RealtimeRepository _realtime;
@@ -100,18 +105,26 @@ class ProviderBackendServices implements BackendServices {
 
   /// Wires the repositories of one provider instance.
   ProviderBackendServices({
+    required DataBackend data,
     required AuthRepository auth,
     required StorageRepository storage,
     required RealtimeRepository realtime,
     required ProductsRepository products,
     required UsersRepository users,
     required Future<void> Function() onDispose,
-  })  : _auth = auth,
+  })  : _data = data,
+        _auth = auth,
         _storage = storage,
         _realtime = realtime,
         _products = products,
         _users = users,
         _onDispose = onDispose;
+
+  @override
+  DataBackend get data {
+    _ensureUsable();
+    return _data;
+  }
 
   @override
   AuthRepository get auth {

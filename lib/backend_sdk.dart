@@ -63,6 +63,7 @@ export 'src/core/dependency_container.dart'
         UnsupportedProviderFailure;
 export 'src/core/resource_codec.dart'
     show BackendResourceDescriptor, CodecFailures, ResourceCodec;
+export 'src/core/data_backend_api.dart';
 export 'src/errors/backend_error_mapper.dart'
     show BackendErrorClassifier, BackendErrorMapper;
 export 'src/errors/backend_error_type.dart';

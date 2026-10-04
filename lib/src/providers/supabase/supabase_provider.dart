@@ -71,6 +71,9 @@ class SupabaseProvider implements BackendServices {
   );
 
   @override
+  DataBackend get data => dataBackend;
+
+  @override
   late final AuthRepository auth = AuthRepository(
     backend: authBackend,
     executor: executor,
@@ -163,8 +166,9 @@ class SupabaseProvider implements BackendServices {
   static Map<BackendResource, List<String>> get _searchableColumns {
     return <BackendResource, List<String>>{
       BackendResource.products:
-          ProductColumnsDefinition.descriptor.searchableFields,
-      BackendResource.users: UserColumnsDefinition.descriptor.searchableFields,
+          ProductColumnsDefinition.descriptor.searchableFields.toList(),
+      BackendResource.users:
+          UserColumnsDefinition.descriptor.searchableFields.toList(),
     };
   }
 
