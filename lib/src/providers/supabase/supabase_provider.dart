@@ -120,16 +120,30 @@ class SupabaseProvider implements BackendServices {
         _configuration = configuration,
         _logger = logger;
 
+  /// A process-wide override for the Supabase client factory.
+  ///
+  /// Set by tests so the **real** built-in provider can be initialized without
+  /// Flutter platform channels or a network. `null`, the default, means the
+  /// `supabase_flutter`-backed client is used, which is what an application
+  /// wants.
+  ///
+  /// This exists because the registration lifecycle has to be verifiable
+  /// end-to-end: a test must be able to call
+  /// `BackendSdk.initialize(provider: BackendProvider.supabase, ...)` and have it
+  /// succeed, rather than merely assert that a factory object exists in a map.
+  static SupabaseClientFactory? clientFactoryOverride;
+
   /// Creates a provider, building the Supabase client with [factory].
   ///
-  /// [factory] defaults to the `supabase_flutter`-backed client, which is what
-  /// a real application wants and what a test replaces.
+  /// Precedence: the [factory] argument, then [clientFactoryOverride], then the
+  /// `supabase_flutter`-backed client.
   static Future<SupabaseProvider> create({
     required BackendConfiguration configuration,
     SupabaseClientFactory? factory,
     BackendLogger logger = const NoopBackendLogger(),
   }) async {
-    final clientFactory = factory ?? createSupabaseClientWithFlutter;
+    final clientFactory =
+        factory ?? clientFactoryOverride ?? createSupabaseClientWithFlutter;
     final client = await clientFactory(
       SupabaseClientOptions(
         url: configuration.url ?? '',

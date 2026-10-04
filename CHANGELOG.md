@@ -7,7 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`BackendSdk.initialize` now registers the built-in providers before it
+  resolves a factory.** Previously the registration lived only in the
+  `BackendSdk.instance` getter, so an application that followed the documented
+  bootstrap - calling `initialize` first, with no `instance` read - received
+  `BackendErrorType.unsupportedProvider` for the Supabase provider shipped in
+  this package. That made the correct order fail and the incorrect order work.
+  Both entry points now register, and the registry is filled in before the
+  factory lookup.
+- Built-in registration is now **idempotent and non-clobbering**: it only fills
+  in providers that are missing, and never replaces a factory an application
+  registered through `BackendServiceFactory.register`. `register` itself keeps
+  its original replace-on-call semantics.
+- The built-in Supabase provider could not be initialized in a unit test, because
+  the default client factory needs Flutter platform channels. Added
+  `SupabaseProvider.clientFactoryOverride` so the real provider can be wired up
+  offline. It is `null` by default, so applications are unaffected.
+
 ### Added
+
+- `BackendSdk.registerBuiltInProviders()` and the top-level
+  `registerBuiltInProviders()`, which expose what the SDK already does
+  automatically. They exist so a test can assert the registry contents without
+  performing a full initialization.
+- `BackendSdk.isInitializedGlobally`, a `static` counterpart to the instance
+  getter `isInitialized`. Reading the lifecycle no longer requires an `instance`
+  read.
+- `BackendServiceFactory.isRegistered(provider)`, backing the non-clobbering
+  behaviour.
+- 20 regression tests in `test/core/provider_registration_test.dart` covering the
+  lifecycle: standalone `initialize`, no `instance` access, built-in resolution
+  end to end, unsupported providers still reporting `unsupportedProvider`, custom
+  factories winning over built-ins, explicit re-registration still replacing, and
+  retry after a failed initialization.
+
+### Deprecated
+
+- `registerDefaultProviders()`, replaced by `registerBuiltInProviders()`. It is
+  now a deprecated alias and is no longer required before `initialize`.
+
+### Changed
 
 - `PageResult<T>.mapItems<R>(R Function(T item) transform)`, which returns a copy
   whose items are the results of applying `transform`. `page`, `pageSize`,

@@ -178,15 +178,26 @@ Future<void> main() async {
 }
 ```
 
+That is the whole bootstrap. Note there is no `BackendSdk.instance` line: the
+call to `initialize` registers the built-in Supabase provider on its own.
+
 Guarantees:
+
+**You never need to touch `BackendSdk.instance` before calling `initialize`.**
+The built-in providers are registered by `initialize` itself, so the bootstrap
+above is complete on its own. `BackendSdk.instance` is only for *reaching the
+repositories* after initialization.
 
 | Rule | Behaviour |
 |---|---|
+| Standalone `initialize` | `initialize` registers the built-in providers before resolving a factory, so it works as the very first call. No `BackendSdk.instance` read required. |
 | Initialize once | A second call **throws** a `BackendErrorType.configuration` failure. The active provider is never silently replaced. |
 | Validate first | Configuration is validated before any network call. |
 | Access before init | Accessing `auth`, `storage`, `realtime`, `products` or `users` throws a `BackendErrorType.configuration` failure, never a null dereference. |
 | Retry after failure | A **failed** initialization clears the in-flight marker, so a corrected configuration can be retried. |
-| Unsupported provider | `BackendProvider.rest` and `.firebase` throw `BackendErrorType.unsupportedProvider` with an actionable message. |
+| Unsupported provider | `BackendProvider.rest` and `.firebase` throw `BackendErrorType.unsupportedProvider` with an actionable message. Registering the built-ins does not enable them. |
+| Built-ins are non-clobbering | Built-in registration only fills in providers that are **missing**. A factory you registered with `BackendServiceFactory.register` is never replaced. |
+| Registration is idempotent | Built-in registration may run any number of times; only the first call has an effect. |
 | No secrets logged | `BackendConfiguration.toString()` omits both the URL and the key. |
 | No `SupabaseClient` exposed | The public API has no provider type in it. This is enforced by `test/public_api_test.dart`. |
 

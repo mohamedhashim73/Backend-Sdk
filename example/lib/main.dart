@@ -57,7 +57,13 @@ Future<void> bootstrap() async {
   );
 }
 
-void main() {
+/// Initializes the SDK, then starts the app.
+///
+/// [bootstrap] is the first thing that runs. It never reads
+/// `BackendSdk.instance`: `BackendSdk.initialize` registers the built-in
+/// providers itself, so this is the only entry point an application needs.
+Future<void> main() async {
+  await bootstrap();
   runApp(const BackendSdkExampleApp());
 }
 

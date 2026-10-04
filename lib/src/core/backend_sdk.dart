@@ -61,13 +61,32 @@ class BackendSdk {
 
   /// The process-wide SDK instance.
   ///
-  /// Reading this getter registers the providers that ship with the package, so
-  /// the first `BackendSdk.instance` access is enough to make
-  /// [initialize] work without any wiring in the application.
+  /// Reading this getter also registers the built-in providers, so
+  /// `BackendSdk.instance` works whether or not [initialize] was called first.
+  /// [initialize] performs the same registration itself, so **an application
+  /// never has to touch `instance` before initializing**:
+  ///
+  /// ```dart
+  /// // Correct: no `BackendSdk.instance` read required.
+  /// await BackendSdk.initialize(
+  ///   provider: BackendProvider.supabase,
+  ///   configuration: BackendConfiguration.supabase(url: ..., apiKey: ...),
+  /// );
+  /// ```
   static BackendSdk get instance {
-    registerDefaultProviders();
+    registerBuiltInProviders();
     return _instance;
   }
+
+  /// Registers the providers that ship with this package.
+  ///
+  /// Called automatically by both [initialize] and [instance], so an application
+  /// never has to call it. It is public for one reason: a test that needs to
+  /// assert the registry contents without performing a full initialization.
+  ///
+  /// Idempotent, and it never replaces a factory registered through
+  /// [BackendServiceFactory.register].
+  static void registerBuiltInProviders() => _registerBuiltInProviders();
 
   static BackendServices? _services;
   static BackendConfiguration? _configuration;
@@ -79,6 +98,14 @@ class BackendSdk {
 
   /// Whether [initialize] has completed and services are available.
   bool get isInitialized => _services != null;
+
+  /// Whether [initialize] has completed and services are available.
+  ///
+  /// [initialize] is a `static` method, so its result cannot be read through an
+  /// instance. This `static` accessor is the equivalent of [isInitialized] for
+  /// code in static context, and it deliberately does **not** read
+  /// [instance]: checking the lifecycle must never be a side-effecting act.
+  static bool get isInitializedGlobally => _services != null;
 
   /// Initializes the SDK.
   ///
@@ -119,6 +146,12 @@ class BackendSdk {
     // retry.
     final completer = Completer<void>();
     _initialization = completer.future;
+
+    // Built-in providers are registered here, *before* the factory is resolved.
+    // Doing this only in the `instance` getter meant that an application which
+    // called `initialize()` first - the correct bootstrap order - got
+    // `unsupportedProvider` for the Supabase provider shipped in this package.
+    registerBuiltInProviders();
 
     _initialize(
       provider: provider,
@@ -371,12 +404,25 @@ void _writeToDeveloperLog(LogEntry entry) {
   );
 }
 
-/// Registers the Supabase provider with the SDK.
+/// Registers the providers that ship with this package.
 ///
-/// Called from `BackendSdk`'s static initializer the first time the singleton is
-/// created, so an application never has to wire the provider itself.
-void registerDefaultProviders() {
-  BackendServiceFactory.register(
+/// Idempotent: calling it repeatedly registers nothing new, and it **never
+/// replaces** a factory an application registered through
+/// [BackendServiceFactory.register]. Only providers that are missing are filled
+/// in.
+///
+/// Both SDK entry points call this - [BackendSdk.initialize] and
+/// [BackendSdk.instance] - so the built-in Supabase provider is always available
+/// regardless of the order an application uses.
+void registerBuiltInProviders() => _registerBuiltInProviders();
+
+/// The single implementation behind every registration entry point.
+///
+/// Kept private under a distinct name because a static member of `BackendSdk`
+/// shadows a same-named top-level function inside the class body, which would
+/// otherwise make the delegating static call itself.
+void _registerBuiltInProviders() {
+  _registerIfAbsent(
     BackendProvider.supabase,
     (configuration, logger) => SupabaseProvider.create(
       configuration: configuration,
@@ -384,3 +430,23 @@ void registerDefaultProviders() {
     ),
   );
 }
+
+void _registerIfAbsent(
+  BackendProvider provider,
+  BackendServiceFactoryEntry entry,
+) {
+  if (BackendServiceFactory.isRegistered(provider)) return;
+  BackendServiceFactory.register(provider, entry);
+}
+
+/// Registers the providers that ship with this package.
+///
+/// Retained under its original name for backward compatibility. It is now
+/// idempotent and non-clobbering, where it previously overwrote any existing
+/// entry, and it is no longer required before
+/// [BackendSdk.initialize].
+@Deprecated(
+  'Use BackendSdk.registerBuiltInProviders(). Registration is now performed '
+  'automatically by BackendSdk.initialize and BackendSdk.instance.',
+)
+void registerDefaultProviders() => registerBuiltInProviders();

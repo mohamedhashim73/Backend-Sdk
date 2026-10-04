@@ -66,6 +66,13 @@ abstract final class BackendServiceFactory {
   static BackendServiceFactoryEntry? of(BackendProvider provider) =>
       _factories[provider];
 
+  /// Whether a factory is already registered for [provider].
+  ///
+  /// Used by the SDK's built-in registration so that it only fills in providers
+  /// that are actually missing, never replacing one an application supplied.
+  static bool isRegistered(BackendProvider provider) =>
+      _factories.containsKey(provider);
+
   /// Every registered provider.
   static Set<BackendProvider> get registeredProviders =>
       _factories.keys.toSet();
