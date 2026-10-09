@@ -1049,6 +1049,32 @@ Application modules live in the consuming Flutter application. They do not
 require a new `BackendResource` enum value, a change to this package, a second
 `SupabaseClient`, or a raw Supabase query.
 
+### RPC for aggregated reads
+
+Use normal repositories and CRUD methods when the screen is reading or
+mutating one resource and benefits from the standard filtering, pagination,
+validation, and typed resource codec flow. Use `BackendSdk.instance.data.callRpc`
+when a backend function intentionally returns a computed or aggregated view
+that would otherwise require multiple coordinated requests, such as a home
+feed combining featured and recommended content.
+
+RPC remains provider-agnostic: pass a safe function identifier, JSON-compatible
+parameters, and an application decoder. The SDK never exposes a provider client,
+raw SQL, or a provider response:
+
+```dart
+final result = await BackendSdk.instance.data.callRpc<HomeFeed>(
+  functionName: 'get_home_feed',
+  parameters: {'locale': 'ar'},
+  decoder: HomeFeed.fromJson,
+);
+```
+
+Function names are validated as identifiers and every provider or decoding
+failure is returned as a `BackendFailure`. Keep authorization and row-level
+security in the backend function; do not use RPC as a way to bypass the normal
+security model.
+
 1. Initialize `backend_sdk` once and obtain `BackendSdk.instance.data`.
 2. Declare a static, validated descriptor with an application-owned key and
    table name:

@@ -6,5 +6,6 @@ export '../contracts/data_backend.dart'
         BackendRecord,
         DataBackend,
         DescriptorCountBackend,
-        DescriptorDataBackend;
+        DescriptorDataBackend,
+        validateRpcFunctionName;
 export '../contracts/data_query_spec.dart' show DataQuerySpec;

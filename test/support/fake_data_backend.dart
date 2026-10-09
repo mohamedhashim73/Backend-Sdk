@@ -21,6 +21,30 @@ import 'fakes.dart' show ArmedFailure, fail, success;
 /// Every spec it receives is recorded, so a test can assert the exact range,
 /// filters and ordering the repository produced.
 class FakeDataBackend implements DataBackend {
+  final Map<String, Object?> rpcResponses = <String, Object?>{};
+
+  @override
+  Future<BackendResult<T>> callRpc<T>({
+    required String functionName,
+    Map<String, Object?> parameters = const {},
+    required T Function(Object? value) decoder,
+  }) async {
+    final validation = validateRpcFunctionName(functionName);
+    if (validation != null) return fail(validation);
+    try {
+      return success(decoder(rpcResponses[functionName]));
+    } catch (error, stackTrace) {
+      return fail(
+        BackendErrorClassifier.build(
+          type: BackendErrorType.validation,
+          message: 'The RPC response could not be decoded.',
+          cause: error,
+          stackTrace: stackTrace,
+        ),
+      );
+    }
+  }
+
   /// Rows keyed by resource, in insertion order.
   final Map<BackendResource, List<BackendRecord>> store =
       <BackendResource, List<BackendRecord>>{};

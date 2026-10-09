@@ -59,6 +59,31 @@ class SupabaseDataBackend
         );
 
   @override
+  Future<BackendResult<T>> callRpc<T>({
+    required String functionName,
+    Map<String, Object?> parameters = const {},
+    required T Function(Object? value) decoder,
+  }) {
+    final validation = validateRpcFunctionName(functionName);
+    if (validation != null) return Future.value(failureOf<T>(validation));
+
+    return _guard<T>('callRpc', () async {
+      final value =
+          await _client.rpc<dynamic>(functionName, params: parameters);
+      try {
+        return decoder(value);
+      } catch (error, stackTrace) {
+        throw _errorMapper.map(
+          error,
+          stackTrace,
+          fallbackType: BackendErrorType.validation,
+          context: {'operation': 'data.callRpc', 'function': functionName},
+        );
+      }
+    });
+  }
+
+  @override
   Future<BackendResult<PageResult<BackendRecord>>> getPage({
     required BackendResourceDescriptor resource,
     required DataQuerySpec spec,
@@ -128,34 +153,43 @@ class SupabaseDataBackend
   Future<BackendResult<BackendRecord>> getById({
     required BackendResourceDescriptor resource,
     required String id,
-  }) => _guard('getById', () async => _client
-      .from(_table(resource))
-      .select('*')
-      .eq(resource.primaryKeyField, id)
-      .limit(1)
-      .single());
+  }) =>
+      _guard(
+          'getById',
+          () async => _client
+              .from(_table(resource))
+              .select('*')
+              .eq(resource.primaryKeyField, id)
+              .limit(1)
+              .single());
 
   @override
   Future<BackendResult<BackendRecord>> create({
     required BackendResourceDescriptor resource,
     required Map<String, Object?> values,
-  }) => _guard('create', () async => _client
-      .from(_table(resource))
-      .insert(values)
-      .select('*')
-      .single());
+  }) =>
+      _guard(
+          'create',
+          () async => _client
+              .from(_table(resource))
+              .insert(values)
+              .select('*')
+              .single());
 
   @override
   Future<BackendResult<BackendRecord>> update({
     required BackendResourceDescriptor resource,
     required String id,
     required Map<String, Object?> values,
-  }) => _guard('update', () async => _client
-      .from(_table(resource))
-      .update(values)
-      .eq(resource.primaryKeyField, id)
-      .select('*')
-      .single());
+  }) =>
+      _guard(
+          'update',
+          () async => _client
+              .from(_table(resource))
+              .update(values)
+              .eq(resource.primaryKeyField, id)
+              .select('*')
+              .single());
 
   @override
   Future<BackendResult<void>> delete({
@@ -163,40 +197,42 @@ class SupabaseDataBackend
     required String id,
     String? softDeleteColumn,
     Object? softDeleteValue,
-  }) => _guard<void>('delete', () async {
-    final table = _client.from(_table(resource));
-    if (softDeleteColumn != null) {
-      final record = await table
-          .update(<String, Object?>{
-            softDeleteColumn:
-                softDeleteValue ?? DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq(resource.primaryKeyField, id)
-          .select('*')
-          .single();
-      return _void(record);
-    }
-    return _void(await table
-        .delete()
-        .eq(resource.primaryKeyField, id)
-        .select(resource.primaryKeyField)
-        .single());
-  });
+  }) =>
+      _guard<void>('delete', () async {
+        final table = _client.from(_table(resource));
+        if (softDeleteColumn != null) {
+          final record = await table
+              .update(<String, Object?>{
+                softDeleteColumn:
+                    softDeleteValue ?? DateTime.now().toUtc().toIso8601String(),
+              })
+              .eq(resource.primaryKeyField, id)
+              .select('*')
+              .single();
+          return _void(record);
+        }
+        return _void(await table
+            .delete()
+            .eq(resource.primaryKeyField, id)
+            .select(resource.primaryKeyField)
+            .single());
+      });
 
   @override
   Future<BackendResult<int>> count({
     required BackendResourceDescriptor resource,
     required DataQuerySpec spec,
-  }) => _guard<int>('count', () async {
-    resource.validate();
-    final filtered = _applySearchDescriptor(
-      _applyFilters(_selectDescriptor(resource), spec),
-      spec,
-      resource,
-    );
-    final response = await filtered.range(0, 0).count(CountOption.exact);
-    return response.count;
-  });
+  }) =>
+      _guard<int>('count', () async {
+        resource.validate();
+        final filtered = _applySearchDescriptor(
+          _applyFilters(_selectDescriptor(resource), spec),
+          spec,
+          resource,
+        );
+        final response = await filtered.range(0, 0).count(CountOption.exact);
+        return response.count;
+      });
 
   @override
   Future<BackendResult<PageResult<BackendRecord>>> readPage({

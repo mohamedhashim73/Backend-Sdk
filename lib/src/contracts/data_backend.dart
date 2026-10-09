@@ -2,6 +2,7 @@ import '../core/backend_resource.dart';
 import '../core/resource_codec.dart';
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
+import '../errors/backend_failure.dart';
 import '../pagination/cursor_page_result.dart';
 import '../pagination/page_result.dart';
 import '../result/backend_result.dart';
@@ -23,6 +24,17 @@ typedef BackendRecord = Map<String, dynamic>;
 /// records in [BackendRecord] form; pagination arithmetic, sorting stability,
 /// retry and error mapping are all handled above this line.
 abstract interface class DataBackend {
+  /// Calls a named backend function with JSON-compatible parameters.
+  ///
+  /// Function names are identifiers, not SQL or provider query fragments. The
+  /// provider must return a JSON-compatible value, which is converted to [T]
+  /// by [decoder]. Both object and list-shaped responses are supported.
+  Future<BackendResult<T>> callRpc<T>({
+    required String functionName,
+    Map<String, Object?> parameters = const {},
+    required T Function(Object? value) decoder,
+  });
+
   /// Reads one page of [resource].
   ///
   /// The [DataQuerySpec.from] and [DataQuerySpec.to] bounds are inclusive on
@@ -86,6 +98,20 @@ abstract interface class DataBackend {
   });
 }
 
+/// Validates an RPC function name before it reaches a provider.
+///
+/// This deliberately accepts only a simple identifier. It prevents the RPC
+/// API from becoming an accidental raw-SQL escape hatch.
+BackendFailure? validateRpcFunctionName(String functionName) {
+  if (!RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(functionName)) {
+    return BackendErrorClassifier.build(
+      type: BackendErrorType.validation,
+      message: 'RPC function names must be safe identifiers.',
+    );
+  }
+  return null;
+}
+
 /// Descriptor-based operations available to all data backends.
 ///
 /// Kept as extensions for source compatibility with providers implementing the
@@ -104,7 +130,9 @@ extension DescriptorDataBackendExtension on DataBackend {
       );
     }
     final legacy = resource.resource;
-    if (legacy == null) return _unsupported<PageResult<BackendRecord>>(resource);
+    if (legacy == null) {
+      return _unsupported<PageResult<BackendRecord>>(resource);
+    }
     return readPage(resource: legacy, spec: spec);
   }
 
@@ -132,7 +160,8 @@ extension DescriptorDataBackendExtension on DataBackend {
     required String id,
   }) {
     if (this is DescriptorDataBackend) {
-      return (this as DescriptorDataBackend).getById(resource: resource, id: id);
+      return (this as DescriptorDataBackend)
+          .getById(resource: resource, id: id);
     }
     final legacy = resource.resource;
     if (legacy == null) return _unsupported<BackendRecord>(resource);
