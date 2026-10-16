@@ -101,6 +101,21 @@ class BackendResourceClient<TModel extends Object, TCreate extends Object,
         cancellationToken: cancellationToken,
       );
 
+  /// Loads a page and maps it to an application-owned response in one call.
+  ///
+  /// The SDK preserves a [BackendFailure] unchanged. Applications own the
+  /// response model they map to, while no datasource repeats `result.when`.
+  Future<BackendResult<TResponse>> fetchPage<TResponse extends Object>({
+    required PageRequest request,
+    required TResponse Function(PageResult<TModel> page) map,
+    CancellationToken? cancellationToken,
+  }) async =>
+      (await getPage(
+        request: request,
+        cancellationToken: cancellationToken,
+      ))
+          .map(map);
+
   /// Reads a cursor-paginated page.
   Future<BackendResult<CursorPageResult<TModel>>> getCursorPage({
     required CursorRequest request,
