@@ -1,0 +1,15 @@
+/// A typed HTTP response returned by [ApiClient].
+class ApiResponse<T> {
+  final T data;
+  final int statusCode;
+  final Map<String, List<String>> headers;
+
+  const ApiResponse({
+    required this.data,
+    required this.statusCode,
+    this.headers = const {},
+  });
+}
+
+/// Decodes an HTTP response body into the model owned by an application.
+typedef ApiDecoder<T> = T Function(Object? body);

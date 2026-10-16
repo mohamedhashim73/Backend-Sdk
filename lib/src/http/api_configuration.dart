@@ -1,0 +1,23 @@
+import '../core/backend_logger.dart';
+import '../retry/retry_policy.dart';
+
+/// Transport configuration for an [ApiClient].
+class ApiConfiguration {
+  final String baseUrl;
+  final Duration connectTimeout;
+  final Duration sendTimeout;
+  final Duration receiveTimeout;
+  final RetryPolicy retryPolicy;
+  final BackendLogger logger;
+  final Map<String, String> defaultHeaders;
+
+  const ApiConfiguration({
+    required this.baseUrl,
+    this.connectTimeout = const Duration(seconds: 30),
+    this.sendTimeout = const Duration(seconds: 30),
+    this.receiveTimeout = const Duration(seconds: 30),
+    this.retryPolicy = RetryPolicy.noRetries,
+    this.logger = const NoopBackendLogger(),
+    this.defaultHeaders = const {},
+  });
+}

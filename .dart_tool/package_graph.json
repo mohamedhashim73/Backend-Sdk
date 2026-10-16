@@ -8,6 +8,7 @@
       "version": "0.1.0",
       "dependencies": [
         "collection",
+        "dio",
         "flutter",
         "supabase",
         "supabase_flutter"
@@ -959,6 +960,29 @@
       "dependencies": [
         "meta",
         "path"
+      ]
+    },
+    {
+      "name": "dio",
+      "version": "5.11.1",
+      "dependencies": [
+        "async",
+        "collection",
+        "dio_web_adapter",
+        "http_parser",
+        "meta",
+        "mime",
+        "path"
+      ]
+    },
+    {
+      "name": "dio_web_adapter",
+      "version": "2.2.2",
+      "dependencies": [
+        "dio",
+        "http_parser",
+        "meta",
+        "web"
       ]
     }
   ],

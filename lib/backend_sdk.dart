@@ -94,6 +94,13 @@ export 'src/filters/filter_condition.dart'
         TextSearchFilter;
 export 'src/filters/filter_operator.dart';
 export 'src/filters/sort_condition.dart';
+export 'src/http/api_client.dart';
+export 'src/http/api_configuration.dart';
+export 'src/http/api_error_mapper.dart';
+export 'src/http/api_method.dart';
+export 'src/http/api_request.dart';
+export 'src/http/api_response.dart';
+export 'src/http/api_session.dart';
 export 'src/modules/products/product_columns.dart';
 export 'src/modules/products/product_mapper.dart'
     show ProductCodec, ProductColumnsDefinition;
