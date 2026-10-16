@@ -1,6 +1,6 @@
 /// Provider-neutral paging input used by application state managers.
 ///
-/// Backends convert this into their own request type, such as [PageRequest].
+/// Backends convert this into their own provider request type.
 /// It intentionally contains no query-string or provider-specific behaviour.
 class PaginationParams {
   final int? page;

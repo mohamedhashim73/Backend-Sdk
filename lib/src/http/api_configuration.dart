@@ -1,7 +1,7 @@
 import '../core/backend_logger.dart';
 import '../retry/retry_policy.dart';
 
-/// Transport configuration for an [ApiClient].
+/// Transport configuration for the SDK REST client.
 class ApiConfiguration {
   final String baseUrl;
   final Duration connectTimeout;

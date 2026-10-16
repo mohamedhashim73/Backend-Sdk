@@ -15,7 +15,7 @@ typedef ApiTokensUpdatedCallback = FutureOr<void> Function(
     ApiSessionTokens tokens);
 typedef ApiSessionExpiredCallback = FutureOr<void> Function();
 
-/// App-owned callbacks used by [ApiClient] for authenticated REST APIs.
+/// App-owned callbacks used by the SDK REST client for authenticated APIs.
 ///
 /// The SDK never persists credentials itself. It asks the application for the
 /// active tokens and tells it when refreshed tokens must be stored or a session

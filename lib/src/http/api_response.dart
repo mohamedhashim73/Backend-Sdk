@@ -1,4 +1,4 @@
-/// A typed HTTP response returned by [ApiClient].
+/// A typed HTTP response returned by the SDK REST client.
 class ApiResponse<T> {
   final T data;
   final int statusCode;

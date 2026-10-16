@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import '../errors/backend_failure.dart';
 
 part 'backend_success.dart';
 part 'backend_failure_result.dart';
+part 'backend_result_extensions.dart';
 
 /// The result of every operation performed by this SDK.
 ///

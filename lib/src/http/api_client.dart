@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
-import '../errors/backend_failure.dart';
 import '../result/backend_result.dart';
 import '../retry/backend_request.dart';
 import '../retry/request_executor.dart';

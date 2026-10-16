@@ -1,4 +1,4 @@
-/// HTTP methods supported by [ApiClient].
+/// HTTP methods supported by the SDK REST client.
 enum ApiMethod { get, post, put, patch, delete }
 
 extension ApiMethodX on ApiMethod {

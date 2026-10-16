@@ -79,6 +79,34 @@ void main() {
       );
       expect(() => unwrap(failureOf<int>(failure)), throwsA(same(failure)));
     });
+
+    test('extensions unwrap and resolve asynchronous branches', () async {
+      const success = BackendSuccess<int>(3);
+      expect(success.unwrapOrThrow(), 3);
+      expect(
+        await success.whenAsync(
+          success: (value) async => value * 2,
+          failure: (_) async => -1,
+        ),
+        6,
+      );
+
+      final failure = BackendErrorClassifier.build(
+        type: BackendErrorType.forbidden,
+        message: 'denied',
+      );
+      expect(
+        () => failureOf<int>(failure).unwrapOrThrow(),
+        throwsA(same(failure)),
+      );
+      expect(
+        await failureOf<int>(failure).whenAsync(
+          success: (_) async => 'success',
+          failure: (error) async => error.type.name,
+        ),
+        'forbidden',
+      );
+    });
   });
 
   group('BackendFailure', () {
