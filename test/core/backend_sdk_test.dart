@@ -1,7 +1,5 @@
 import 'package:backend_sdk/backend_sdk.dart';
 import 'package:backend_sdk/src/contracts/auth_backend.dart';
-import 'package:backend_sdk/src/contracts/data_backend.dart';
-import 'package:backend_sdk/src/contracts/data_query_spec.dart';
 import 'package:backend_sdk/src/contracts/realtime_backend.dart';
 import 'package:backend_sdk/src/contracts/storage_backend.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -569,6 +567,7 @@ class _FakeServices implements BackendServices {
   final BackendConfiguration configuration;
 
   late final RequestExecutor executor;
+  @override
   late final FakeDataBackend data;
   late final AuthRepository _authRepository;
   late final StorageRepository _storageRepository;

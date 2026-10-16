@@ -32,8 +32,9 @@ class HistoricalNarrative {
 }
 
 class HistoricalNarrativeCodec
-    implements ResourceCodec<HistoricalNarrative, Map<String, Object?>,
-        Map<String, Object?>> {
+    implements
+        ResourceCodec<HistoricalNarrative, Map<String, Object?>,
+            Map<String, Object?>> {
   const HistoricalNarrativeCodec();
 
   @override
@@ -53,11 +54,13 @@ class HistoricalNarrativeCodec
   }
 
   @override
-  BackendResult<Map<String, Object?>> encodeCreate(Map<String, Object?> value) =>
+  BackendResult<Map<String, Object?>> encodeCreate(
+          Map<String, Object?> value) =>
       BackendSuccess(Map<String, Object?>.unmodifiable(value));
 
   @override
-  BackendResult<Map<String, Object?>> encodeUpdate(Map<String, Object?> value) =>
+  BackendResult<Map<String, Object?>> encodeUpdate(
+          Map<String, Object?> value) =>
       BackendSuccess(Map<String, Object?>.unmodifiable(value));
 
   @override
@@ -70,11 +73,9 @@ class HistoricalNarrativeCodec
 class HistoricalNarrativesRepository extends BackendRepository<
     HistoricalNarrative, Map<String, Object?>, Map<String, Object?>> {
   HistoricalNarrativesRepository({
-    required DataBackend backend,
-    required RequestExecutor executor,
+    required super.backend,
+    required super.executor,
   }) : super(
-          backend: backend,
-          executor: executor,
           codec: const HistoricalNarrativeCodec(),
         );
 }

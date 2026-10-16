@@ -4,6 +4,7 @@ library;
 export '../contracts/data_backend.dart'
     show
         BackendRecord,
+        BackendFunctionBackend,
         DataBackend,
         DescriptorCountBackend,
         DescriptorDataBackend,

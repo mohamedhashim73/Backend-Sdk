@@ -3,18 +3,23 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import '../auth/auth_repository.dart';
+import '../auth/backend_token_provider.dart';
 import '../contracts/data_backend.dart';
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
 import '../errors/backend_failure.dart';
 import '../modules/products/products_repository.dart';
 import '../modules/users/users_repository.dart';
+import '../operations/backend_operation_client.dart';
 import '../providers/supabase/supabase_provider.dart';
 import '../realtime/realtime_repository.dart';
+import '../retry/request_executor.dart';
+import '../retry/retry_policy.dart';
 import '../storage/storage_repository.dart';
 import 'backend_configuration.dart';
 import 'backend_logger.dart';
 import 'backend_provider.dart';
+import 'backend_resource_definition.dart';
 import 'dependency_container.dart';
 
 /// The entry point of the backend SDK.
@@ -91,6 +96,7 @@ class BackendSdk {
 
   static BackendServices? _services;
   static BackendConfiguration? _configuration;
+  static BackendLogger? _logger;
   static Future<void>? _initialization;
 
   /// The configuration the active provider was built with, or `null` before
@@ -196,6 +202,7 @@ class BackendSdk {
       final services = await factory(configuration, effectiveLogger);
       _services = services;
       _configuration = configuration;
+      _logger = effectiveLogger;
       effectiveLogger.info(
         'Backend SDK initialized.',
         context: {'provider': provider.name},
@@ -288,6 +295,8 @@ class BackendSdk {
         'The retry backoff multiplier must be at least 1.',
       );
     }
+    final routingError = configuration.routing.validate();
+    if (routingError != null) return _configurationFailure(routingError);
     return null;
   }
 
@@ -325,6 +334,7 @@ class BackendSdk {
     final services = _services;
     _services = null;
     _configuration = null;
+    _logger = null;
     _initialization = null;
     await services?.dispose();
   }
@@ -335,6 +345,7 @@ class BackendSdk {
   static void resetForTesting() {
     _services = null;
     _configuration = null;
+    _logger = null;
     _initialization = null;
   }
 
@@ -355,6 +366,44 @@ class BackendSdk {
 
   /// The users module.
   UsersRepository get users => _require('users').users;
+
+  /// Creates a typed CRUD client from one app-owned resource definition.
+  ///
+  /// The client inherits the SDK timeout, retry, session and provider setup;
+  /// application data sources do not construct codecs or executors.
+  BackendResourceClient<TModel, TCreate, TUpdate> resource<
+      TModel extends Object, TCreate extends Object, TUpdate extends Object>(
+    BackendResourceDefinition<TModel, TCreate, TUpdate> definition,
+  ) {
+    final configuration = _configuration;
+    _require('resource');
+    if (configuration == null) {
+      throw _configurationFailure(
+          'BackendSdk.resource requires initialization.');
+    }
+    return BackendResourceClient<TModel, TCreate, TUpdate>(
+      backend: data,
+      definition: definition,
+      executor: _createExecutor(configuration),
+      logger: _logger ?? const NoopBackendLogger(),
+    );
+  }
+
+  /// Creates a typed client for aggregate, RPC or provider-function work.
+  BackendOperationClient operations() {
+    final configuration = _configuration;
+    _require('operations');
+    if (configuration == null) {
+      throw _configurationFailure(
+          'BackendSdk.operations requires initialization.');
+    }
+    return BackendOperationClient(
+      backend: data,
+      routing: configuration.routing,
+      tokens: AuthRepositoryTokenProvider(auth),
+      executor: _createExecutor(configuration),
+    );
+  }
 
   BackendServices _require(String member) {
     final services = _services;
@@ -384,6 +433,19 @@ class BackendSdk {
       sink: _writeToDeveloperLog,
       // Debug entries are noisy in production; info, warning and error are not.
       isDebug: false,
+    );
+  }
+
+  static RequestExecutor _createExecutor(BackendConfiguration configuration) {
+    return RequestExecutor(
+      retryPolicy: RetryPolicy(
+        maxRetries: configuration.maxRetries,
+        baseDelay: configuration.retryDelay,
+        backoffMultiplier: configuration.retryBackoffMultiplier,
+        maxDelay: configuration.maxRetryDelay,
+      ),
+      requestTimeout: configuration.requestTimeout,
+      logger: _logger ?? const NoopBackendLogger(),
     );
   }
 }

@@ -27,6 +27,7 @@ result.when(
 
 - [Why](#why)
 - [Architecture](#architecture)
+- [Application resource and operation clients](#application-resource-and-operation-clients)
 - [Installation](#installation)
 - [Initialization](#initialization)
 - [Environment configuration](#environment-configuration)
@@ -136,6 +137,63 @@ backend_sdk/
 | `RealtimeBackend` | subscribe, emit typed events, unsubscribe, dispose |
 
 Nothing above these contracts knows which backend is active.
+
+## Application resource and operation clients
+
+An app keeps its domain model and request types. The SDK owns the repeating
+infrastructure: encoding boundary, pagination, retries, routing and session
+requirements. Define provider targets once at initialization:
+
+```dart
+await BackendSdk.initialize(
+  provider: BackendProvider.supabase,
+  configuration: BackendConfiguration.supabase(
+    url: AppEnvironment.supabaseUrl,
+    apiKey: AppEnvironment.supabaseAnonKey,
+    routing: const BackendRouting(
+      resourceTargets: {'news': 'news'},
+      operationTargets: {'home.load': 'get_home_feed'},
+    ),
+  ),
+);
+```
+
+For ordinary CRUD, define the model mapping once and inject the resulting typed
+client into the application data source:
+
+```dart
+final newsClient = BackendSdk.instance.resource(
+  BackendResourceDefinition<NewsModel, CreateNews, UpdateNews>(
+    descriptor: const BackendResourceDescriptor(key: 'news'),
+    fromJson: NewsModel.fromJson,
+    toCreateJson: (request) => request.toJson(),
+    toUpdateJson: (request) => request.toJson(),
+  ),
+);
+```
+
+For an aggregate, RPC, callable function or endpoint, define a typed operation:
+
+```dart
+const homeLoad = BackendOperation<HomeRequest, HomeResponse>(
+  key: 'home.load',
+  authScope: BackendAuthScope.optional,
+  encode: HomeRequest.toJson,
+  decode: HomeResponse.fromJson,
+);
+
+final result = await BackendSdk.instance.operations().execute(
+  homeLoad,
+  const HomeRequest(locale: 'ar'),
+);
+```
+
+The data source now holds only app concepts. It has no provider client, raw
+map, target name, token, retry setup or response decoder. Supabase resolves an
+operation target as an RPC today; a Firebase or REST provider can resolve the
+same logical key as a callable function or endpoint later. Authentication is
+resolved internally through `BackendTokenProvider`; applications never pass a
+token per request.
 
 ---
 

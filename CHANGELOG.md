@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `BackendRouting`, configured once through `BackendConfiguration`, maps logical
+  application resource and operation keys to provider targets. Supabase now
+  resolves these targets to tables and RPCs; future Firebase and REST adapters
+  can resolve the same logical keys to collections/functions and endpoints.
+- `BackendResourceDefinition` and `BackendResourceClient`: a typed CRUD path
+  that replaces one codec class plus repeated repository/executor wiring with a
+  single model mapping definition.
+- `BackendOperation`, `BackendOperationClient` and `BackendAuthScope` for typed
+  aggregate/function calls such as a home feed. A data source no longer knows
+  the provider target, raw payload shape, session requirement or retry setup.
+- `BackendTokenProvider` and `AuthRepositoryTokenProvider`, so SDK clients own
+  session lookup and refresh instead of applications passing bearer tokens.
+- `BackendRequest`, `RequestExecutor.execute` and `executeResult`, providing a
+  provider-neutral request context and one retry/timeout path for calls that
+  return either values or `BackendResult`s.
+- `BackendPage` / `BackendCursorPage` aliases and common pagination getters
+  (`count`, `total`, `currentPage`, `perPage`, `totalPages`, `hasNext`) on the
+  existing result classes.
+- Regression coverage for typed operations, centralized routing and
+  definition-based model decoding.
+
 ### Fixed
 
 - **`BackendSdk.initialize` now registers the built-in providers before it

@@ -51,7 +51,11 @@ class BackendResourceDescriptor {
   /// A stable application-level key for this resource.
   final String key;
 
-  /// The validated physical table/collection name used by the provider.
+  /// Legacy provider target for this resource.
+  ///
+  /// New definitions should use SDK routing during SDK
+  /// initialization. This remains for migration compatibility only.
+  @Deprecated('Configure BackendRouting.resourceTargets instead.')
   final String tableName;
 
   /// The primary key column name.
@@ -82,22 +86,24 @@ class BackendResourceDescriptor {
     String? key,
     String? tableName,
     this.primaryKeyField = 'id',
-    Iterable<String> searchableFields = const <String>{},
+    this.searchableFields = const <String>{},
     this.defaultSorting = const [],
     this.softDeleteField,
     this.createdAtField,
     this.updatedAtField,
-  })  : key = key ?? (resource == BackendResource.products
-            ? 'products'
-            : resource == BackendResource.users
-                ? 'users'
-                : ''),
-        tableName = tableName ?? (resource == BackendResource.products
-            ? 'products'
-            : resource == BackendResource.users
-                ? 'users'
-                : ''),
-        searchableFields = searchableFields;
+  })  : key = key ??
+            (resource == BackendResource.products
+                ? 'products'
+                : resource == BackendResource.users
+                    ? 'users'
+                    : ''),
+        tableName = tableName ??
+            key ??
+            (resource == BackendResource.products
+                ? 'products'
+                : resource == BackendResource.users
+                    ? 'users'
+                    : '');
 
   /// Whether this descriptor contains only safe identifier names.
   bool get isValid {

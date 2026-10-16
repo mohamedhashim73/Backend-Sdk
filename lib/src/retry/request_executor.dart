@@ -5,6 +5,7 @@ import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
 import '../errors/backend_failure.dart';
 import '../result/backend_result.dart';
+import 'backend_request.dart';
 import 'cancellation_token.dart';
 import 'retry_policy.dart';
 
@@ -56,7 +57,27 @@ class RequestExecutor {
     required Future<T> Function() action,
     BackendErrorType fallbackErrorType = BackendErrorType.unknown,
     CancellationToken? cancellationToken,
+  }) =>
+      execute<T>(
+        request: BackendRequest(
+          operation: operation,
+          fallbackErrorType: fallbackErrorType,
+          cancellationToken: cancellationToken,
+        ),
+        action: action,
+      );
+
+  /// Executes [action] using provider-neutral [request] metadata.
+  ///
+  /// New SDK clients should use this overload so the same executor can serve
+  /// Supabase, Firebase and REST adapters without provider-specific APIs.
+  Future<BackendResult<T>> execute<T>({
+    required BackendRequest request,
+    required Future<T> Function() action,
   }) async {
+    final operation = request.operation;
+    final fallbackErrorType = request.fallbackErrorType;
+    final cancellationToken = request.cancellationToken;
     var attempt = 0;
     BackendFailure? lastFailure;
 
@@ -138,6 +159,20 @@ class RequestExecutor {
           ),
     );
   }
+
+  /// Executes an action that already returns a [BackendResult].
+  ///
+  /// A failure result is unwrapped inside the retry pipeline, so retryable
+  /// provider failures preserve the same timeout/retry semantics as thrown
+  /// transport failures.
+  Future<BackendResult<T>> executeResult<T>({
+    required BackendRequest request,
+    required Future<BackendResult<T>> Function() action,
+  }) =>
+      execute<T>(
+        request: request,
+        action: () async => unwrap(await action()),
+      );
 
   Future<T> _withTimeout<T>(String operation, Future<T> Function() action) {
     if (requestTimeout <= Duration.zero) {

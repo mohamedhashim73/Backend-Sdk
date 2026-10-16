@@ -53,6 +53,7 @@ class SupabaseProvider implements BackendServices {
     client: _client,
     errorMapper: _errorMapper,
     searchableColumns: _searchableColumns,
+    routing: _configuration.routing,
   );
 
   late final AuthBackend authBackend = SupabaseAuthBackend(

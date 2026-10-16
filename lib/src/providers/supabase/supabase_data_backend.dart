@@ -12,6 +12,7 @@ import 'package:supabase/supabase.dart'
 import '../../contracts/data_backend.dart';
 import '../../contracts/data_query_spec.dart';
 import '../../core/backend_resource.dart';
+import '../../core/backend_routing.dart';
 import '../../core/resource_codec.dart';
 import '../../errors/backend_error_mapper.dart';
 import '../../errors/backend_error_type.dart';
@@ -36,12 +37,19 @@ import 'supabase_mappers.dart';
 /// jitter, and a second retry layer would multiply the attempts and defeat the
 /// SDK-wide retry budget.
 class SupabaseDataBackend
-    implements DataBackend, DescriptorDataBackend, DescriptorCountBackend {
+    implements
+        DataBackend,
+        BackendFunctionBackend,
+        DescriptorDataBackend,
+        DescriptorCountBackend {
   final SupabaseClient _client;
   final SupabaseErrorMapper _errorMapper;
 
   /// Maps a resource to the columns a free-text search term is matched against.
   final Map<BackendResource, List<String>> _searchableColumns;
+
+  /// Central provider-target routing configured by the application.
+  final BackendRouting _routing;
 
   /// Creates the adapter over [client].
   ///
@@ -52,8 +60,10 @@ class SupabaseDataBackend
     required SupabaseClient client,
     SupabaseErrorMapper errorMapper = const SupabaseErrorMapper(),
     Map<BackendResource, List<String>> searchableColumns = const {},
+    BackendRouting routing = const BackendRouting(),
   })  : _client = client,
         _errorMapper = errorMapper,
+        _routing = routing,
         _searchableColumns = Map<BackendResource, List<String>>.unmodifiable(
           searchableColumns,
         );
@@ -82,6 +92,18 @@ class SupabaseDataBackend
       }
     });
   }
+
+  @override
+  Future<BackendResult<T>> executeFunction<T>({
+    required String target,
+    Map<String, Object?> parameters = const {},
+    required T Function(Object? value) decoder,
+  }) =>
+      callRpc(
+        functionName: target,
+        parameters: parameters,
+        decoder: decoder,
+      );
 
   @override
   Future<BackendResult<PageResult<BackendRecord>>> getPage({
@@ -497,7 +519,15 @@ class SupabaseDataBackend
 
   String _table(BackendResourceDescriptor resource) {
     resource.validate();
-    return resource.tableName;
+    final target = _routing.resourceTarget(resource.key) ?? resource.tableName;
+    if (!RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(target)) {
+      throw BackendErrorClassifier.build(
+        type: BackendErrorType.configuration,
+        message: 'The configured resource target for "${resource.key}" is '
+            'not a safe Supabase identifier.',
+      );
+    }
+    return target;
   }
 
   PostgrestFilterBuilder<PostgrestList> _applySearchDescriptor(

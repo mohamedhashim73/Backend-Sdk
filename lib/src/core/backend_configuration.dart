@@ -1,4 +1,5 @@
 import 'backend_provider.dart';
+import 'backend_routing.dart';
 
 /// Immutable, validated configuration for a single `BackendSdk` instance.
 ///
@@ -60,6 +61,12 @@ class BackendConfiguration {
   /// The upper bound applied to any single backoff delay.
   final Duration maxRetryDelay;
 
+  /// The app-owned logical resource and operation routes.
+  ///
+  /// This is the single place an application maps a resource/operation key to
+  /// a provider target. Data sources and models remain provider-agnostic.
+  final BackendRouting routing;
+
   /// Creates a configuration.
   ///
   /// Prefer the [BackendConfiguration.supabase] named constructor for
@@ -74,6 +81,7 @@ class BackendConfiguration {
     this.retryDelay = const Duration(milliseconds: 200),
     this.retryBackoffMultiplier = 2.0,
     this.maxRetryDelay = const Duration(seconds: 10),
+    this.routing = const BackendRouting(),
   });
 
   /// Creates a configuration for the Supabase provider.
@@ -90,6 +98,7 @@ class BackendConfiguration {
     Duration retryDelay = const Duration(milliseconds: 200),
     double retryBackoffMultiplier = 2.0,
     Duration maxRetryDelay = const Duration(seconds: 10),
+    BackendRouting routing = const BackendRouting(),
   }) {
     return BackendConfiguration(
       provider: BackendProvider.supabase,
@@ -101,6 +110,7 @@ class BackendConfiguration {
       retryDelay: retryDelay,
       retryBackoffMultiplier: retryBackoffMultiplier,
       maxRetryDelay: maxRetryDelay,
+      routing: routing,
     );
   }
 
@@ -115,6 +125,7 @@ class BackendConfiguration {
     Duration? retryDelay,
     double? retryBackoffMultiplier,
     Duration? maxRetryDelay,
+    BackendRouting? routing,
   }) {
     return BackendConfiguration(
       provider: provider ?? this.provider,
@@ -127,6 +138,7 @@ class BackendConfiguration {
       retryBackoffMultiplier:
           retryBackoffMultiplier ?? this.retryBackoffMultiplier,
       maxRetryDelay: maxRetryDelay ?? this.maxRetryDelay,
+      routing: routing ?? this.routing,
     );
   }
 

@@ -61,6 +61,25 @@ class PageResult<T> {
   /// The number of records in this page.
   int get length => items.length;
 
+  /// Alias for [length] used by common API pagination contracts.
+  int get count => length;
+
+  /// Alias for [page], matching common API pagination terminology.
+  int get currentPage => page;
+
+  /// Alias for [pageSize], matching common API pagination terminology.
+  int get perPage => pageSize;
+
+  /// Alias for [totalCount], when the backend was asked for an exact total.
+  int? get total => totalCount;
+
+  /// The total number of pages when [totalCount] is available.
+  int? get totalPages =>
+      totalCount == null ? null : (totalCount! / pageSize).ceil();
+
+  /// Alias for [hasMore], matching common API pagination terminology.
+  bool get hasNext => hasMore;
+
   /// Whether this page contains no records.
   bool get isEmpty => items.isEmpty;
 

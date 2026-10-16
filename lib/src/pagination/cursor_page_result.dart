@@ -26,6 +26,15 @@ class CursorPageResult<T> {
   /// The number of records in this page.
   int get length => items.length;
 
+  /// Alias for [length] used by common API pagination contracts.
+  int get count => length;
+
+  /// Alias for [totalCount], when the backend was asked for an exact total.
+  int? get total => totalCount;
+
+  /// Alias for [hasMore], matching common API cursor terminology.
+  bool get hasNext => hasMore;
+
   /// Whether this page contains no records.
   bool get isEmpty => items.isEmpty;
 

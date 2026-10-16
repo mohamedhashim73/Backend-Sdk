@@ -98,6 +98,21 @@ abstract interface class DataBackend {
   });
 }
 
+/// Optional provider capability for application operations.
+///
+/// `target` is deliberately provider-neutral. For Supabase it is an RPC name;
+/// a Firebase adapter may treat it as a callable function and a REST adapter as
+/// a route. New typed operation clients prefer this contract and only fall back
+/// to [DataBackend.callRpc] for legacy backends.
+abstract interface class BackendFunctionBackend {
+  /// Executes a provider function and decodes its JSON-compatible payload.
+  Future<BackendResult<T>> executeFunction<T>({
+    required String target,
+    Map<String, Object?> parameters = const {},
+    required T Function(Object? value) decoder,
+  });
+}
+
 /// Validates an RPC function name before it reaches a provider.
 ///
 /// This deliberately accepts only a simple identifier. It prevents the RPC

@@ -1,5 +1,4 @@
 import 'package:backend_sdk/backend_sdk.dart';
-import 'package:backend_sdk/src/contracts/data_backend.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_data_backend.dart';

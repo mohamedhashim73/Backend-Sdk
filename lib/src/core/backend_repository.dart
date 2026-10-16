@@ -67,7 +67,8 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
   BackendResourceDescriptor get descriptor => codec.descriptor;
 
   /// The legacy built-in resource, when one exists.
-  BackendResource get resource => descriptor.resource ??
+  BackendResource get resource =>
+      descriptor.resource ??
       (throw StateError(
         'Application-defined repositories use descriptor, not the legacy '
         'BackendResource enum.',
@@ -192,12 +193,12 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
     );
 
     final result = await executor.run<CursorPageResult<BackendRecord>>(
-        operation: '$resourceKey.getCursorPage',
+      operation: '$resourceKey.getCursorPage',
       fallbackErrorType: BackendErrorType.database,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
-          await backend.getCursorPage(
-            resource: descriptor,
+        await backend.getCursorPage(
+          resource: descriptor,
           cursor: request.cursor,
           spec: spec,
         ),

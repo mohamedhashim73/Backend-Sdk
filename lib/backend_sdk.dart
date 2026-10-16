@@ -49,12 +49,21 @@ export 'src/auth/auth_repository.dart';
 export 'src/auth/auth_session.dart';
 export 'src/auth/auth_state.dart';
 export 'src/auth/auth_user.dart';
+export 'src/auth/backend_token_provider.dart';
 export 'src/core/backend_configuration.dart';
 export 'src/core/backend_logger.dart';
 export 'src/core/backend_provider.dart';
 export 'src/core/backend_repository.dart' show BackendRepository;
 export 'src/core/backend_resource.dart';
+export 'src/core/backend_resource_definition.dart'
+    show
+        BackendJsonDecoder,
+        BackendPayloadEncoder,
+        BackendResourceClient,
+        BackendResourceDefinition;
+export 'src/core/backend_routing.dart';
 export 'src/core/backend_sdk.dart';
+export 'src/core/data_backend_api.dart';
 export 'src/core/dependency_container.dart'
     show
         BackendServiceFactory,
@@ -63,7 +72,6 @@ export 'src/core/dependency_container.dart'
         UnsupportedProviderFailure;
 export 'src/core/resource_codec.dart'
     show BackendResourceDescriptor, CodecFailures, ResourceCodec;
-export 'src/core/data_backend_api.dart';
 export 'src/errors/backend_error_mapper.dart'
     show BackendErrorClassifier, BackendErrorMapper;
 export 'src/errors/backend_error_type.dart';
@@ -95,6 +103,10 @@ export 'src/modules/products/products_repository.dart';
 export 'src/modules/users/user_model.dart';
 export 'src/modules/users/user_requests.dart';
 export 'src/modules/users/users_repository.dart';
+export 'src/operations/backend_auth_scope.dart';
+export 'src/operations/backend_operation.dart';
+export 'src/operations/backend_operation_client.dart';
+export 'src/pagination/backend_page.dart';
 export 'src/pagination/cursor_page_result.dart';
 export 'src/pagination/cursor_request.dart';
 export 'src/pagination/page_request.dart';
@@ -106,6 +118,7 @@ export 'src/realtime/realtime_repository.dart'
 export 'src/realtime/realtime_resource.dart'
     show RealtimeResource, RealtimeSubscription;
 export 'src/result/backend_result.dart';
+export 'src/retry/backend_request.dart';
 export 'src/retry/cancellation_token.dart';
 export 'src/retry/request_executor.dart';
 export 'src/retry/retry_policy.dart';
