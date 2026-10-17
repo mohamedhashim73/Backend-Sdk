@@ -13,8 +13,7 @@ class ApiErrorMapper {
     final type = switch (error.type) {
       DioExceptionType.connectionTimeout ||
       DioExceptionType.sendTimeout ||
-      DioExceptionType.receiveTimeout ||
-      DioExceptionType.transformTimeout =>
+      DioExceptionType.receiveTimeout =>
         BackendErrorType.timeout,
       DioExceptionType.connectionError ||
       DioExceptionType.badCertificate =>
@@ -28,6 +27,7 @@ class ApiErrorMapper {
           statusCode: statusCode,
           fallbackType: BackendErrorType.unknown,
         ),
+      _ => BackendErrorType.timeout,
     };
 
     return BackendErrorClassifier.build(
