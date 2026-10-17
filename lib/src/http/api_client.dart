@@ -134,7 +134,7 @@ class ApiClient {
     final headers = <String, dynamic>{...request.headers};
     final locale = await session?.localeProvider?.call();
     if (locale?.trim().isNotEmpty == true) {
-      headers['X-Locale'] = locale;
+      headers[session!.localeHeaderName] = locale;
     }
     if (request.requiresAuthentication &&
         accessToken?.trim().isNotEmpty == true) {
@@ -231,7 +231,8 @@ class ApiClient {
         data: <String, Object?>{'refresh_token': refreshToken},
         options: Options(
           headers: {
-            if (locale?.trim().isNotEmpty == true) 'X-Locale': locale,
+            if (locale?.trim().isNotEmpty == true)
+              session.localeHeaderName: locale,
           },
         ),
       );

@@ -24,6 +24,7 @@ class ApiSessionConfiguration {
   final ApiAccessTokenProvider accessTokenProvider;
   final ApiRefreshTokenProvider refreshTokenProvider;
   final ApiLocaleProvider? localeProvider;
+  final String localeHeaderName;
   final ApiTokensUpdatedCallback onTokensUpdated;
   final ApiSessionExpiredCallback onSessionExpired;
   final String refreshPath;
@@ -36,8 +37,9 @@ class ApiSessionConfiguration {
     required this.onSessionExpired,
     required this.refreshPath,
     this.localeProvider,
+    this.localeHeaderName = 'X-Locale',
     this.expiredStatusCodes = const {401, 419},
-  });
+  }) : assert(localeHeaderName != '');
 }
 
 /// Ensures one expiry callback runs for a failed token, even when concurrent

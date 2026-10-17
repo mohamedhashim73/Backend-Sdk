@@ -30,4 +30,43 @@ void main() {
     expect(result.data?.statusCode, 200);
     expect(result.failure, isNull);
   });
+
+  test('uses the configured locale header name', () async {
+    late RequestOptions requestOptions;
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestOptions = options;
+            handler.resolve(
+              Response<Object?>(
+                requestOptions: options,
+                statusCode: 200,
+                data: null,
+              ),
+            );
+          },
+        ),
+      );
+    final client = ApiClient(
+      configuration: const ApiConfiguration(baseUrl: 'https://api.example.com'),
+      dio: dio,
+      session: ApiSessionConfiguration(
+        accessTokenProvider: () => null,
+        refreshTokenProvider: () => null,
+        localeProvider: () => 'ar',
+        localeHeaderName: 'X-Language',
+        onTokensUpdated: (_) {},
+        onSessionExpired: () {},
+        refreshPath: '/auth/refresh-token',
+      ),
+    );
+
+    await client.send<void>(
+      const ApiRequest.get(path: '/public', requiresAuthentication: false),
+    );
+
+    expect(requestOptions.headers['X-Language'], 'ar');
+    expect(requestOptions.headers.containsKey('X-Locale'), isFalse);
+  });
 }
