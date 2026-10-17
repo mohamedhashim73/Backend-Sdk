@@ -70,6 +70,70 @@ class ApiRequest {
           enableLogging: enableLogging,
           multipart: multipart,
         );
+
+  /// Creates an authenticated or public PUT request.
+  const ApiRequest.put({
+    required String path,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+    ApiMultipartBody? multipart,
+  }) : this(
+          method: ApiMethod.put,
+          path: path,
+          body: body,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+          multipart: multipart,
+        );
+
+  /// Creates an authenticated or public PATCH request.
+  const ApiRequest.patch({
+    required String path,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+    ApiMultipartBody? multipart,
+  }) : this(
+          method: ApiMethod.patch,
+          path: path,
+          body: body,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+          multipart: multipart,
+        );
+
+  /// Creates an authenticated or public DELETE request.
+  const ApiRequest.delete({
+    required String path,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+  }) : this(
+          method: ApiMethod.delete,
+          path: path,
+          body: body,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+        );
 }
 
 /// Multipart request payload that works on mobile, web and Dart without
