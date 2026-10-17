@@ -33,10 +33,10 @@ class PaginationModel {
   factory PaginationModel.fromJson(Map<String, dynamic> json) {
     return PaginationModel(
       total: _asInt(json['total']),
-      count: _asInt(json['count']),
-      perPage: _asInt(json['per_page']),
-      currentPage: _asInt(json['current_page']),
-      totalPages: _asInt(json['total_pages']),
+      count: _asInt(json['count'] ?? json['size']),
+      perPage: _asInt(json['per_page'] ?? json['size']),
+      currentPage: _asInt(json['current_page'] ?? json['currentPage']),
+      totalPages: _asInt(json['total_pages'] ?? json['totalPages']),
     );
   }
 

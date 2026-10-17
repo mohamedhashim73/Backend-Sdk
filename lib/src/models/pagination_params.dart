@@ -16,4 +16,16 @@ class PaginationParams {
       search: search ?? this.search,
     );
   }
+
+  /// Converts generic pagination input to query parameters for an HTTP API.
+  Map<String, Object?> toQueryParameters({
+    String pageKey = 'page',
+    String perPageKey = 'perPage',
+    String searchKey = 'search',
+  }) =>
+      {
+        if (page != null) pageKey: page,
+        if (perPage != null) perPageKey: perPage,
+        if (search?.trim().isNotEmpty == true) searchKey: search,
+      };
 }
