@@ -63,6 +63,130 @@ class ApiClient {
     );
   }
 
+  /// Sends a GET request without exposing a transport-specific response type.
+  Future<BackendResult<ApiResponse<T>>> get<T>({
+    required String path,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+    ApiDecoder<T>? decode,
+  }) =>
+      send<T>(
+        ApiRequest.get(
+          path: path,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+        ),
+        decode: decode,
+      );
+
+  /// Sends a POST request without exposing a transport-specific response type.
+  Future<BackendResult<ApiResponse<T>>> post<T>({
+    required String path,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+    ApiMultipartBody? multipart,
+    ApiDecoder<T>? decode,
+  }) =>
+      send<T>(
+        ApiRequest.post(
+          path: path,
+          body: body,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+          multipart: multipart,
+        ),
+        decode: decode,
+      );
+
+  /// Sends a PUT request without exposing a transport-specific response type.
+  Future<BackendResult<ApiResponse<T>>> put<T>({
+    required String path,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+    ApiMultipartBody? multipart,
+    ApiDecoder<T>? decode,
+  }) =>
+      send<T>(
+        ApiRequest.put(
+          path: path,
+          body: body,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+          multipart: multipart,
+        ),
+        decode: decode,
+      );
+
+  /// Sends a PATCH request without exposing a transport-specific response type.
+  Future<BackendResult<ApiResponse<T>>> patch<T>({
+    required String path,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+    ApiMultipartBody? multipart,
+    ApiDecoder<T>? decode,
+  }) =>
+      send<T>(
+        ApiRequest.patch(
+          path: path,
+          body: body,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+          multipart: multipart,
+        ),
+        decode: decode,
+      );
+
+  /// Sends a DELETE request without exposing a transport-specific response type.
+  Future<BackendResult<ApiResponse<T>>> delete<T>({
+    required String path,
+    Object? body,
+    Map<String, Object?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    bool requiresAuthentication = true,
+    bool allowSessionRefresh = true,
+    bool enableLogging = false,
+    ApiDecoder<T>? decode,
+  }) =>
+      send<T>(
+        ApiRequest.delete(
+          path: path,
+          body: body,
+          queryParameters: queryParameters,
+          headers: headers,
+          requiresAuthentication: requiresAuthentication,
+          allowSessionRefresh: allowSessionRefresh,
+          enableLogging: enableLogging,
+        ),
+        decode: decode,
+      );
+
   /// Clears the once-per-token session-expiry guard after a user signs in.
   void resetSessionExpiryGuard() => _expiryCoordinator?.reset();
 
