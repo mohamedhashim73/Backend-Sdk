@@ -183,7 +183,28 @@ class ApiMultipartFile {
   MultipartFile toMultipartFile() => MultipartFile.fromBytes(
         bytes,
         filename: filename,
-        contentType:
-            contentType == null ? null : DioMediaType.parse(contentType!),
+        contentType: _resolvedContentType == null
+            ? null
+            : DioMediaType.parse(_resolvedContentType!),
       );
+
+  String? get _resolvedContentType => contentType ?? _contentTypeFor(filename);
+
+  static String? _contentTypeFor(String filename) {
+    final dotIndex = filename.lastIndexOf('.');
+    if (dotIndex < 0 || dotIndex == filename.length - 1) return null;
+
+    return switch (filename.substring(dotIndex + 1).toLowerCase()) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      'heic' => 'image/heic',
+      'heif' => 'image/heif',
+      'pdf' => 'application/pdf',
+      'mp4' => 'video/mp4',
+      'mov' => 'video/quicktime',
+      _ => null,
+    };
+  }
 }
