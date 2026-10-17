@@ -69,4 +69,34 @@ void main() {
     expect(requestOptions.headers['X-Language'], 'ar');
     expect(requestOptions.headers.containsKey('X-Locale'), isFalse);
   });
+
+  test('logs every API request when configuration logging is enabled',
+      () async {
+    final entries = <LogEntry>[];
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.resolve(
+            Response<Object?>(
+              requestOptions: options,
+              statusCode: 200,
+              data: null,
+            ),
+          ),
+        ),
+      );
+    final client = ApiClient(
+      configuration: ApiConfiguration(
+        baseUrl: 'https://api.example.com',
+        isLoggingOn: true,
+        logger: CallbackBackendLogger(sink: entries.add),
+      ),
+      dio: dio,
+    );
+
+    await client.get<void>(path: '/news', requiresAuthentication: false);
+
+    expect(entries.map((entry) => entry.message), contains('➡️ API Request'));
+    expect(entries.map((entry) => entry.message), contains('✅ API Response'));
+  });
 }

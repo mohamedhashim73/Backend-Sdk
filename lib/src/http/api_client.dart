@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 
+import '../core/backend_logger.dart';
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
 import '../result/backend_result.dart';
@@ -23,6 +25,7 @@ class ApiClient {
   final Dio _dio;
   final ApiConfiguration configuration;
   final ApiSessionConfiguration? session;
+  final BackendLogger _logger;
   final RequestExecutor _executor;
   final ApiSessionExpiryCoordinator? _expiryCoordinator;
   Future<BackendResult<ApiSessionTokens>>? _refreshing;
@@ -32,10 +35,11 @@ class ApiClient {
     this.session,
     Dio? dio,
   })  : _dio = dio ?? Dio(),
+        _logger = _resolveLogger(configuration),
         _executor = RequestExecutor(
           retryPolicy: configuration.retryPolicy,
           requestTimeout: configuration.receiveTimeout,
-          logger: configuration.logger,
+          logger: _resolveLogger(configuration),
         ),
         _expiryCoordinator = session == null
             ? null
@@ -200,6 +204,7 @@ class ApiClient {
         await _perform<T>(request, accessToken: accessToken, decode: decode),
       );
     } on DioException catch (error, stackTrace) {
+      _logError(request, error);
       if (!_shouldRefresh(request, error)) {
         return BackendFailureResult<ApiResponse<T>>(
           error: ApiErrorMapper.fromDio(error, stackTrace),
@@ -225,11 +230,13 @@ class ApiClient {
           ),
         );
       } on DioException catch (retryError, retryStackTrace) {
+        _logError(request, retryError);
         await _expireSession(tokens.accessToken);
         return BackendFailureResult<ApiResponse<T>>(
           error: ApiErrorMapper.fromDio(retryError, retryStackTrace),
         );
       } on Object catch (retryError, retryStackTrace) {
+        _logError(request, retryError);
         return BackendFailureResult<ApiResponse<T>>(
           error: BackendErrorClassifier.fromException(
             retryError,
@@ -239,6 +246,7 @@ class ApiClient {
         );
       }
     } on Object catch (error, stackTrace) {
+      _logError(request, error);
       return BackendFailureResult<ApiResponse<T>>(
         error: BackendErrorClassifier.fromException(
           error,
@@ -410,12 +418,12 @@ class ApiClient {
   }
 
   void _logRequest(ApiRequest request, {required bool isRetriedRequest}) {
-    if (!request.enableLogging) return;
-    configuration.logger.debug(
-      'HTTP request',
+    if (!_shouldLog(request)) return;
+    _logger.debug(
+      '➡️ API Request',
       context: {
         'method': request.method.value,
-        'path': request.path,
+        'url': _urlFor(request),
         'query': request.queryParameters,
         'retry': isRetriedRequest,
       },
@@ -423,14 +431,58 @@ class ApiClient {
   }
 
   void _logResponse(ApiRequest request, int? statusCode) {
-    if (!request.enableLogging) return;
-    configuration.logger.info(
-      'HTTP response',
+    if (!_shouldLog(request)) return;
+    _logger.info(
+      '✅ API Response',
       context: {
         'method': request.method.value,
-        'path': request.path,
+        'url': _urlFor(request),
         'statusCode': statusCode,
       },
     );
   }
+
+  void _logError(ApiRequest request, Object error) {
+    if (!_shouldLog(request)) return;
+    final dioError = error is DioException ? error : null;
+    _logger.error(
+      '❌ API Error',
+      context: {
+        'method': request.method.value,
+        'url': _urlFor(request),
+        'statusCode': dioError?.response?.statusCode,
+        'type': dioError?.type.name ?? error.runtimeType.toString(),
+        'message': dioError?.message ?? error.toString(),
+      },
+    );
+  }
+
+  bool _shouldLog(ApiRequest request) =>
+      configuration.isLoggingOn || request.enableLogging;
+
+  Uri _urlFor(ApiRequest request) {
+    final path = Uri.parse(request.path);
+    final uri = path.hasScheme
+        ? path
+        : Uri.parse(configuration.baseUrl).resolveUri(path);
+    return uri.replace(
+      queryParameters: {
+        ...uri.queryParameters,
+        for (final entry in request.queryParameters.entries)
+          if (entry.value != null) entry.key: entry.value.toString(),
+      },
+    );
+  }
+
+  static BackendLogger _resolveLogger(ApiConfiguration configuration) {
+    if (configuration.logger is! NoopBackendLogger) {
+      return configuration.logger;
+    }
+    if (!configuration.isLoggingOn) return const NoopBackendLogger();
+    return const CallbackBackendLogger(sink: _writeToDeveloperLog);
+  }
+}
+
+void _writeToDeveloperLog(LogEntry entry) {
+  developer.log(entry.toString(), name: 'backend_sdk');
 }

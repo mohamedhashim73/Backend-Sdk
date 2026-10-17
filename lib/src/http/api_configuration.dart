@@ -9,6 +9,7 @@ class ApiConfiguration {
   final Duration receiveTimeout;
   final RetryPolicy retryPolicy;
   final BackendLogger logger;
+  final bool isLoggingOn;
   final Map<String, String> defaultHeaders;
 
   const ApiConfiguration({
@@ -18,6 +19,7 @@ class ApiConfiguration {
     this.receiveTimeout = const Duration(seconds: 30),
     this.retryPolicy = RetryPolicy.noRetries,
     this.logger = const NoopBackendLogger(),
+    this.isLoggingOn = false,
     this.defaultHeaders = const {},
   });
 }
