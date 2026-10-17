@@ -465,13 +465,14 @@ class ApiClient {
     final uri = path.hasScheme
         ? path
         : Uri.parse(configuration.baseUrl).resolveUri(path);
-    return uri.replace(
-      queryParameters: {
-        ...uri.queryParameters,
-        for (final entry in request.queryParameters.entries)
-          if (entry.value != null) entry.key: entry.value.toString(),
-      },
-    );
+    final queryParameters = <String, String>{
+      ...uri.queryParameters,
+      for (final entry in request.queryParameters.entries)
+        if (entry.value != null) entry.key: entry.value.toString(),
+    };
+    return queryParameters.isEmpty
+        ? uri
+        : uri.replace(queryParameters: queryParameters);
   }
 
   static BackendLogger _resolveLogger(ApiConfiguration configuration) {
