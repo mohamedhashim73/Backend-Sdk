@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:backend_sdk/backend_sdk.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,5 +100,74 @@ void main() {
 
     expect(entries.map((entry) => entry.message), contains('➡️ API Request'));
     expect(entries.map((entry) => entry.message), contains('✅ API Response'));
+  });
+
+  test('logs JSON and multipart payload shapes without sensitive values',
+      () async {
+    final entries = <LogEntry>[];
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.resolve(
+            Response<Object?>(
+              requestOptions: options,
+              statusCode: 200,
+              data: null,
+            ),
+          ),
+        ),
+      );
+    final client = ApiClient(
+      configuration: ApiConfiguration(
+        baseUrl: 'https://api.example.com',
+        isLoggingOn: true,
+        logger: CallbackBackendLogger(sink: entries.add),
+      ),
+      dio: dio,
+    );
+
+    await client.post<void>(
+      path: '/profile',
+      requiresAuthentication: false,
+      body: {'name': 'Sara', 'fcmToken': 'secret'},
+    );
+    await client.post<void>(
+      path: '/profile/image',
+      requiresAuthentication: false,
+      multipart: ApiMultipartBody(
+        fields: {'fullName': 'Sara', 'tempToken': 'secret'},
+        files: [
+          ApiMultipartFile(
+            field: 'image',
+            filename: 'avatar.jpg',
+            bytes: Uint8List(4),
+          ),
+        ],
+      ),
+    );
+
+    final requestBodies = entries
+        .where((entry) => entry.message == '➡️ API Request')
+        .map((entry) => entry.context['body'])
+        .toList();
+    expect(requestBodies[0], {
+      'name': 'Sara',
+      'fcmToken': CallbackBackendLogger.redactedValue,
+    });
+    expect(requestBodies[1], {
+      'type': 'multipart',
+      'fields': {
+        'fullName': 'Sara',
+        'tempToken': CallbackBackendLogger.redactedValue,
+      },
+      'files': [
+        {
+          'field': 'image',
+          'filename': 'avatar.jpg',
+          'contentType': 'image/jpeg',
+          'bytes': 4,
+        },
+      ],
+    });
   });
 }

@@ -425,9 +425,30 @@ class ApiClient {
         'method': request.method.value,
         'url': _urlFor(request),
         'query': request.queryParameters,
+        if (request.body != null || request.multipart != null)
+          'body': _logBody(request),
         'retry': isRetriedRequest,
       },
     );
+  }
+
+  Object? _logBody(ApiRequest request) {
+    final multipart = request.multipart;
+    if (multipart == null) return request.body;
+
+    return {
+      'type': 'multipart',
+      'fields': multipart.fields,
+      'files': [
+        for (final file in multipart.files)
+          {
+            'field': file.field,
+            'filename': file.filename,
+            'contentType': file.resolvedContentType,
+            'bytes': file.bytes.length,
+          },
+      ],
+    };
   }
 
   void _logResponse(ApiRequest request, int? statusCode) {

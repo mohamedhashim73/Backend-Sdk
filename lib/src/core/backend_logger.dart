@@ -128,12 +128,12 @@ class CallbackBackendLogger implements BackendLogger {
         result[entry.key] = redactedValue;
         continue;
       }
-      result[entry.key] = _truncate(entry.value);
+      result[entry.key] = _sanitize(entry.value);
     }
     return result;
   }
 
-  static Object? _truncate(Object? value) {
+  static Object? _sanitize(Object? value) {
     if (value == null) return null;
     if (value is String) {
       return value.length <= maxValueLength
@@ -141,7 +141,17 @@ class CallbackBackendLogger implements BackendLogger {
           : '${value.substring(0, maxValueLength)}…';
     }
     if (value is num || value is bool) return value;
-    return _truncate(value.toString());
+    if (value is Map) {
+      return {
+        for (final entry in value.entries)
+          entry.key.toString():
+              _sensitiveKeyPattern.hasMatch(entry.key.toString())
+                  ? redactedValue
+                  : _sanitize(entry.value),
+      };
+    }
+    if (value is Iterable) return value.map(_sanitize).toList(growable: false);
+    return _sanitize(value.toString());
   }
 }
 

@@ -183,12 +183,13 @@ class ApiMultipartFile {
   MultipartFile toMultipartFile() => MultipartFile.fromBytes(
         bytes,
         filename: filename,
-        contentType: _resolvedContentType == null
+        contentType: resolvedContentType == null
             ? null
-            : DioMediaType.parse(_resolvedContentType!),
+            : DioMediaType.parse(resolvedContentType!),
       );
 
-  String? get _resolvedContentType => contentType ?? _contentTypeFor(filename);
+  /// The explicit or filename-derived content type used for the upload.
+  String? get resolvedContentType => contentType ?? _contentTypeFor(filename);
 
   static String? _contentTypeFor(String filename) {
     final dotIndex = filename.lastIndexOf('.');
