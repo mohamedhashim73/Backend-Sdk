@@ -8,6 +8,7 @@ import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
 import '../errors/backend_failure.dart';
 import '../filters/filter_condition.dart';
+import '../filters/filter_operator.dart';
 import '../filters/sort_condition.dart';
 import '../pagination/cursor_page_result.dart';
 import '../pagination/cursor_request.dart';
@@ -349,6 +350,44 @@ class BackendRepository<TModel extends Object, TCreate extends Object,
       cancellationToken: cancellationToken,
       action: () async => unwrap(
         await backend.delete(resource: descriptor, id: id.trim()),
+      ),
+    );
+  }
+
+  /// Permanently removes all records matching non-empty equality filters.
+  ///
+  /// This is intended for composite/link resources where the descriptor's
+  /// primary key identifies one side of a one-to-many relationship. It is
+  /// deliberately restricted to exact equality filters so replacing links
+  /// cannot accidentally delete an entire resource or a range of records.
+  Future<BackendResult<void>> deleteWhere({
+    required List<FilterCondition> filters,
+    CancellationToken? cancellationToken,
+  }) async {
+    if (filters.isEmpty) {
+      return failureOf(
+        _validation('At least one exact filter is required for deleteWhere.'),
+      );
+    }
+    final invalid = _validateFilters(filters);
+    if (invalid != null) return failureOf(invalid);
+    if (filters.any((filter) => filter.operator != FilterOperator.equals)) {
+      return failureOf(
+        _validation('deleteWhere only supports equality filters.'),
+      );
+    }
+
+    final spec = DataQuerySpec(
+      from: 0,
+      to: 0,
+      filters: List<FilterCondition>.unmodifiable(filters),
+    );
+    return executor.run<void>(
+      operation: '$resourceKey.deleteWhere',
+      fallbackErrorType: BackendErrorType.database,
+      cancellationToken: cancellationToken,
+      action: () async => unwrap(
+        await backend.deleteWhere(resource: descriptor, spec: spec),
       ),
     );
   }

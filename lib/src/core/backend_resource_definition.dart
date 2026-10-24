@@ -1,5 +1,6 @@
 import '../contracts/data_backend.dart';
 import '../errors/backend_failure.dart';
+import '../filters/filter_condition.dart';
 import '../pagination/cursor_page_result.dart';
 import '../pagination/cursor_request.dart';
 import '../pagination/page_request.dart';
@@ -157,6 +158,19 @@ class BackendResourceClient<TModel extends Object, TCreate extends Object,
     CancellationToken? cancellationToken,
   }) =>
       _repository.delete(id, cancellationToken: cancellationToken);
+
+  /// Deletes all records matching exact equality filters.
+  ///
+  /// Use this for composite/link resources whose primary key is shared by
+  /// multiple rows. The SDK rejects empty and non-equality filters.
+  Future<BackendResult<void>> deleteWhere({
+    required List<FilterCondition> filters,
+    CancellationToken? cancellationToken,
+  }) =>
+      _repository.deleteWhere(
+        filters: filters,
+        cancellationToken: cancellationToken,
+      );
 }
 
 class _DefinitionResourceCodec<TModel extends Object, TCreate extends Object,

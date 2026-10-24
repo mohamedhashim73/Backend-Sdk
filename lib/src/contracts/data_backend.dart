@@ -267,6 +267,46 @@ extension DescriptorDataBackendExtension on DataBackend {
   }
 }
 
+/// Optional exact-filter delete operation for composite/link resources.
+///
+/// This is intentionally separate from [DescriptorDataBackend] so existing
+/// providers do not have to implement a destructive operation they do not
+/// support. The repository accepts only non-empty equality filters, which
+/// prevents an accidental unbounded or range delete from crossing the SDK
+/// boundary.
+abstract interface class DescriptorDeleteBackend {
+  /// Deletes every record matching the exact equality filters in [spec].
+  Future<BackendResult<void>> deleteWhere({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  });
+}
+
+/// Adds the optional exact-filter delete capability to descriptor backends.
+extension DescriptorDeleteDataBackendExtension on DataBackend {
+  /// Deletes records matching the provider-neutral exact filters in [spec].
+  Future<BackendResult<void>> deleteWhere({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  }) {
+    if (this is DescriptorDeleteBackend) {
+      return (this as DescriptorDeleteBackend).deleteWhere(
+        resource: resource,
+        spec: spec,
+      );
+    }
+    return Future.value(
+      failureOf<void>(
+        BackendErrorClassifier.build(
+          type: BackendErrorType.unsupportedProvider,
+          message: 'The configured data backend does not support exact-filter '
+              'deletes for application-defined resources.',
+        ),
+      ),
+    );
+  }
+}
+
 /// Optional provider extension implemented by providers that support custom
 /// application-defined descriptors.
 abstract interface class DescriptorDataBackend {

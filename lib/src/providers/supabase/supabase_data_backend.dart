@@ -41,7 +41,8 @@ class SupabaseDataBackend
         DataBackend,
         BackendFunctionBackend,
         DescriptorDataBackend,
-        DescriptorCountBackend {
+        DescriptorCountBackend,
+        DescriptorDeleteBackend {
   final SupabaseClient _client;
   final SupabaseErrorMapper _errorMapper;
 
@@ -241,6 +242,22 @@ class SupabaseDataBackend
       });
 
   @override
+  Future<BackendResult<void>> deleteWhere({
+    required BackendResourceDescriptor resource,
+    required DataQuerySpec spec,
+  }) =>
+      _guard<void>('deleteWhere', () async {
+        resource.validate();
+        await _applyFilters(
+          _client.from(_table(resource)).delete(),
+          spec,
+        ).select(resource.primaryKeyField);
+        // A filtered delete may affect zero, one or many rows. Unlike the
+        // single-record delete, zero rows are a valid idempotent outcome.
+        return;
+      });
+
+  @override
   Future<BackendResult<int>> count({
     required BackendResourceDescriptor resource,
     required DataQuerySpec spec,
@@ -430,8 +447,8 @@ class SupabaseDataBackend
     });
   }
 
-  PostgrestFilterBuilder<PostgrestList> _applyFilters(
-    PostgrestFilterBuilder<PostgrestList> query,
+  PostgrestFilterBuilder<T> _applyFilters<T>(
+    PostgrestFilterBuilder<T> query,
     DataQuerySpec spec,
   ) {
     var result = query;
