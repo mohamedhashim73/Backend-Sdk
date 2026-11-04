@@ -153,7 +153,8 @@ class CallbackBackendLogger implements BackendLogger {
   }
 
   /// Returns a sanitized copy of [context], optionally preserving sensitive
-  /// values for explicitly enabled local diagnostics.
+  /// values for explicitly enabled local diagnostics. When redaction is
+  /// disabled, values are kept in full so request payloads can be inspected.
   static Map<String, Object?> sanitize(
     Map<String, Object?> context, {
     bool redactSensitiveData = true,
@@ -179,6 +180,7 @@ class CallbackBackendLogger implements BackendLogger {
   }) {
     if (value == null) return null;
     if (value is String) {
+      if (!redactSensitiveData) return value;
       return value.length <= maxValueLength
           ? value
           : '${value.substring(0, maxValueLength)}…';

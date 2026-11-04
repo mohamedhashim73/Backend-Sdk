@@ -14,7 +14,8 @@ class ApiConfiguration {
   /// Whether sensitive values are redacted before log entries are emitted.
   ///
   /// Keep this enabled outside local diagnostics. It defaults to `true` so
-  /// enabling request logging cannot expose credentials by accident.
+  /// enabling request logging cannot expose credentials by accident. When set
+  /// to `false`, diagnostic values are emitted in full.
   final bool redactSensitiveLogs;
   final Map<String, String> defaultHeaders;
 

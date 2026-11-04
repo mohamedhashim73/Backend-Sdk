@@ -461,6 +461,7 @@ void main() {
 
     test('sensitive context keys can be shown for local diagnostics', () {
       final entries = <LogEntry>[];
+      final identityToken = 'test-id-token-${'x' * 500}';
       CallbackBackendLogger(
         sink: entries.add,
         redactSensitiveData: false,
@@ -474,6 +475,13 @@ void main() {
 
       expect(entries.single.context['id_token'], 'test-id-token');
       expect(entries.single.context['device_token'], 'test-device-token');
+
+      CallbackBackendLogger(
+        sink: entries.add,
+        redactSensitiveData: false,
+      ).info('long-auth', context: {'id_token': identityToken});
+
+      expect(entries.last.context['id_token'], identityToken);
     });
 
     test('long context values are truncated', () {
