@@ -10,6 +10,12 @@ class ApiConfiguration {
   final RetryPolicy retryPolicy;
   final BackendLogger logger;
   final bool isLoggingOn;
+
+  /// Whether sensitive values are redacted before log entries are emitted.
+  ///
+  /// Keep this enabled outside local diagnostics. It defaults to `true` so
+  /// enabling request logging cannot expose credentials by accident.
+  final bool redactSensitiveLogs;
   final Map<String, String> defaultHeaders;
 
   const ApiConfiguration({
@@ -20,6 +26,7 @@ class ApiConfiguration {
     this.retryPolicy = RetryPolicy.noRetries,
     this.logger = const NoopBackendLogger(),
     this.isLoggingOn = false,
+    this.redactSensitiveLogs = true,
     this.defaultHeaders = const {},
   });
 }

@@ -503,7 +503,10 @@ class ApiClient {
       return configuration.logger;
     }
     if (!configuration.isLoggingOn) return const NoopBackendLogger();
-    return const CallbackBackendLogger(sink: _writeToDeveloperLog);
+    return CallbackBackendLogger(
+      sink: _writeToDeveloperLog,
+      redactSensitiveData: configuration.redactSensitiveLogs,
+    );
   }
 }
 

@@ -459,6 +459,23 @@ void main() {
       expect(entries.single.toString(), isNot(contains('hunter2')));
     });
 
+    test('sensitive context keys can be shown for local diagnostics', () {
+      final entries = <LogEntry>[];
+      CallbackBackendLogger(
+        sink: entries.add,
+        redactSensitiveData: false,
+      ).info(
+        'auth',
+        context: const {
+          'id_token': 'test-id-token',
+          'device_token': 'test-device-token',
+        },
+      );
+
+      expect(entries.single.context['id_token'], 'test-id-token');
+      expect(entries.single.context['device_token'], 'test-device-token');
+    });
+
     test('long context values are truncated', () {
       final entries = <LogEntry>[];
       CallbackBackendLogger(sink: entries.add).info(

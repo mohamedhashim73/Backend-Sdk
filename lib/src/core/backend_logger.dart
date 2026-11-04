@@ -2,9 +2,9 @@ import 'dart:collection';
 
 /// A pluggable logging sink for the SDK.
 ///
-/// The SDK never logs credentials, access tokens, refresh tokens, API keys or
-/// file contents. `redact` is applied to every context map before it reaches an
-/// implementation, so a careless context value cannot leak a secret.
+/// The SDK redacts credentials, access tokens, refresh tokens, API keys and
+/// file contents by default. Redaction can be explicitly disabled for local
+/// diagnostics, so applications must keep that option off outside testing.
 abstract interface class BackendLogger {
   /// Records a verbose diagnostic message.
   void debug(String message, {Map<String, Object?> context = const {}});
@@ -50,7 +50,7 @@ class NoopBackendLogger implements BackendLogger {
   }) {}
 }
 
-/// Signature of the sink that receives already-redacted log lines.
+/// Signature of the sink that receives sanitized log lines.
 ///
 /// A plain function signature keeps the SDK free of any `print`/`debugPrint`
 /// dependency, so an application can route entries into `logging`,
@@ -73,28 +73,55 @@ class CallbackBackendLogger implements BackendLogger {
 
   final BackendLogSink _sink;
   final bool _isDebug;
+  final bool _redactSensitiveData;
 
-  /// Creates a logger that forwards redacted entries to [_sink].
-  const CallbackBackendLogger(
-      {required BackendLogSink sink, bool isDebug = true})
-      : _sink = sink,
-        _isDebug = isDebug;
+  /// Creates a logger that forwards sanitized entries to [_sink].
+  ///
+  /// [redactSensitiveData] defaults to `true`. Set it to `false` only for
+  /// short-lived local diagnostics when request values must be inspected.
+  const CallbackBackendLogger({
+    required BackendLogSink sink,
+    bool isDebug = true,
+    bool redactSensitiveData = true,
+  })  : _sink = sink,
+        _isDebug = isDebug,
+        _redactSensitiveData = redactSensitiveData;
 
   @override
   void debug(String message, {Map<String, Object?> context = const {}}) {
     if (!_isDebug) return;
-    _sink(LogEntry(level: LogLevel.debug, message: message, context: context));
+    _sink(
+      LogEntry(
+        level: LogLevel.debug,
+        message: message,
+        context: context,
+        redactSensitiveData: _redactSensitiveData,
+      ),
+    );
   }
 
   @override
   void info(String message, {Map<String, Object?> context = const {}}) {
-    _sink(LogEntry(level: LogLevel.info, message: message, context: context));
+    _sink(
+      LogEntry(
+        level: LogLevel.info,
+        message: message,
+        context: context,
+        redactSensitiveData: _redactSensitiveData,
+      ),
+    );
   }
 
   @override
   void warn(String message, {Map<String, Object?> context = const {}}) {
     _sink(
-        LogEntry(level: LogLevel.warning, message: message, context: context));
+      LogEntry(
+        level: LogLevel.warning,
+        message: message,
+        context: context,
+        redactSensitiveData: _redactSensitiveData,
+      ),
+    );
   }
 
   @override
@@ -111,29 +138,45 @@ class CallbackBackendLogger implements BackendLogger {
         context: context,
         cause: cause,
         stackTrace: stackTrace,
+        redactSensitiveData: _redactSensitiveData,
       ),
     );
   }
 
-  /// Returns a copy of [context] with sensitive values removed.
+  /// Returns a sanitized copy of [context].
   ///
   /// Keys that look like credentials are replaced entirely and every remaining
   /// value is truncated, because a full provider error payload can contain an
   /// echoed request body.
   static Map<String, Object?> redact(Map<String, Object?> context) {
+    return sanitize(context);
+  }
+
+  /// Returns a sanitized copy of [context], optionally preserving sensitive
+  /// values for explicitly enabled local diagnostics.
+  static Map<String, Object?> sanitize(
+    Map<String, Object?> context, {
+    bool redactSensitiveData = true,
+  }) {
     if (context.isEmpty) return const {};
     final result = <String, Object?>{};
     for (final entry in context.entries) {
-      if (_sensitiveKeyPattern.hasMatch(entry.key)) {
+      if (redactSensitiveData && _sensitiveKeyPattern.hasMatch(entry.key)) {
         result[entry.key] = redactedValue;
         continue;
       }
-      result[entry.key] = _sanitize(entry.value);
+      result[entry.key] = _sanitize(
+        entry.value,
+        redactSensitiveData: redactSensitiveData,
+      );
     }
     return result;
   }
 
-  static Object? _sanitize(Object? value) {
+  static Object? _sanitize(
+    Object? value, {
+    required bool redactSensitiveData,
+  }) {
     if (value == null) return null;
     if (value is String) {
       return value.length <= maxValueLength
@@ -144,14 +187,27 @@ class CallbackBackendLogger implements BackendLogger {
     if (value is Map) {
       return {
         for (final entry in value.entries)
-          entry.key.toString():
-              _sensitiveKeyPattern.hasMatch(entry.key.toString())
-                  ? redactedValue
-                  : _sanitize(entry.value),
+          entry.key.toString(): redactSensitiveData &&
+                  _sensitiveKeyPattern.hasMatch(entry.key.toString())
+              ? redactedValue
+              : _sanitize(
+                  entry.value,
+                  redactSensitiveData: redactSensitiveData,
+                ),
       };
     }
-    if (value is Iterable) return value.map(_sanitize).toList(growable: false);
-    return _sanitize(value.toString());
+    if (value is Iterable) {
+      return value
+          .map(
+            (item) => _sanitize(
+              item,
+              redactSensitiveData: redactSensitiveData,
+            ),
+          )
+          .toList(growable: false);
+    }
+    return _sanitize(value.toString(),
+        redactSensitiveData: redactSensitiveData);
   }
 }
 
@@ -170,7 +226,7 @@ enum LogLevel {
   error,
 }
 
-/// A single, already-redacted log record.
+/// A single sanitized log record.
 class LogEntry {
   /// The severity of this entry.
   final LogLevel level;
@@ -178,7 +234,8 @@ class LogEntry {
   /// The log message.
   final String message;
 
-  /// Additional structured context, already passed through redaction.
+  /// Additional structured context, sanitized according to the logger
+  /// configuration.
   final Map<String, Object?> context;
 
   /// The error that triggered this entry, if any.
@@ -194,7 +251,13 @@ class LogEntry {
     Map<String, Object?> context = const {},
     this.cause,
     this.stackTrace,
-  }) : context = UnmodifiableMapView(CallbackBackendLogger.redact(context));
+    bool redactSensitiveData = true,
+  }) : context = UnmodifiableMapView(
+          CallbackBackendLogger.sanitize(
+            context,
+            redactSensitiveData: redactSensitiveData,
+          ),
+        );
 
   @override
   String toString() {
