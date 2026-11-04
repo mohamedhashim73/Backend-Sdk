@@ -82,7 +82,7 @@ void main() {
             Response<Object?>(
               requestOptions: options,
               statusCode: 200,
-              data: null,
+              data: <String, Object?>{'ok': true},
             ),
           ),
         ),
@@ -100,6 +100,63 @@ void main() {
 
     expect(entries.map((entry) => entry.message), contains('➡️ API Request'));
     expect(entries.map((entry) => entry.message), contains('✅ API Response'));
+    final responseEntry = entries.singleWhere(
+      (entry) => entry.message == '✅ API Response',
+    );
+    expect(responseEntry.context['response'], {'ok': true});
+  });
+
+  test('logs failed response bodies without exposing sensitive fields',
+      () async {
+    final entries = <LogEntry>[];
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.reject(
+            DioException(
+              requestOptions: options,
+              response: Response<Object?>(
+                requestOptions: options,
+                statusCode: 422,
+                data: <String, Object?>{
+                  'message': 'Validation failed',
+                  'access_token': 'secret-access-token',
+                  'errors': <String, Object?>{
+                    'apple_id': <String>['Apple ID is already used'],
+                  },
+                },
+              ),
+              type: DioExceptionType.badResponse,
+            ),
+          ),
+        ),
+      );
+    final client = ApiClient(
+      configuration: ApiConfiguration(
+        baseUrl: 'https://api.example.com',
+        isLoggingOn: true,
+        logger: CallbackBackendLogger(sink: entries.add),
+      ),
+      dio: dio,
+    );
+
+    final result = await client.post<void>(
+      path: '/auth/register/complete',
+      requiresAuthentication: false,
+      body: {'apple_id': 'apple-user-id'},
+    );
+
+    expect(result.failure?.statusCode, 422);
+    final errorEntry = entries.singleWhere(
+      (entry) => entry.message == '❌ API Error',
+    );
+    expect(errorEntry.context['response'], {
+      'message': 'Validation failed',
+      'access_token': CallbackBackendLogger.redactedValue,
+      'errors': {
+        'apple_id': ['Apple ID is already used'],
+      },
+    });
   });
 
   test('logs JSON and multipart payload shapes without sensitive values',

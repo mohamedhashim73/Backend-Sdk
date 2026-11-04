@@ -286,7 +286,7 @@ class ApiClient {
             : Headers.multipartFormDataContentType,
       ),
     );
-    _logResponse(request, response.statusCode);
+    _logResponse(request, response.statusCode, response.data);
 
     final statusCode = response.statusCode;
     if (statusCode == null || statusCode < 200 || statusCode >= 300) {
@@ -451,7 +451,7 @@ class ApiClient {
     };
   }
 
-  void _logResponse(ApiRequest request, int? statusCode) {
+  void _logResponse(ApiRequest request, int? statusCode, Object? responseBody) {
     if (!_shouldLog(request)) return;
     _logger.info(
       '✅ API Response',
@@ -459,6 +459,7 @@ class ApiClient {
         'method': request.method.value,
         'url': _urlFor(request),
         'statusCode': statusCode,
+        'response': responseBody,
       },
     );
   }
@@ -474,6 +475,7 @@ class ApiClient {
         'statusCode': dioError?.response?.statusCode,
         'type': dioError?.type.name ?? error.runtimeType.toString(),
         'message': dioError?.message ?? error.toString(),
+        'response': dioError?.response?.data,
       },
     );
   }
