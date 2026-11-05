@@ -91,6 +91,7 @@ void main() {
       configuration: ApiConfiguration(
         baseUrl: 'https://api.example.com',
         isLoggingOn: true,
+        isResponseLoggingOn: true,
         logger: CallbackBackendLogger(sink: entries.add),
       ),
       dio: dio,
@@ -135,6 +136,7 @@ void main() {
       configuration: ApiConfiguration(
         baseUrl: 'https://api.example.com',
         isLoggingOn: true,
+        isResponseLoggingOn: true,
         logger: CallbackBackendLogger(sink: entries.add),
       ),
       dio: dio,
@@ -157,6 +159,53 @@ void main() {
         'apple_id': ['Apple ID is already used'],
       },
     });
+  });
+
+  test('does not log response bodies unless response logging is enabled',
+      () async {
+    final entries = <LogEntry>[];
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.reject(
+            DioException(
+              requestOptions: options,
+              response: Response<Object?>(
+                requestOptions: options,
+                statusCode: 422,
+                data: <String, Object?>{'message': 'Validation failed'},
+              ),
+              type: DioExceptionType.badResponse,
+            ),
+          ),
+        ),
+      );
+    final client = ApiClient(
+      configuration: ApiConfiguration(
+        baseUrl: 'https://api.example.com',
+        isLoggingOn: true,
+        logger: CallbackBackendLogger(sink: entries.add),
+      ),
+      dio: dio,
+    );
+
+    await client.get<void>(path: '/news', requiresAuthentication: false);
+
+    expect(entries.map((entry) => entry.message), contains('➡️ API Request'));
+    expect(entries.map((entry) => entry.message), contains('❌ API Error'));
+    expect(entries.map((entry) => entry.message),
+        isNot(contains('✅ API Response')));
+    final errorEntry = entries.singleWhere(
+      (entry) => entry.message == '❌ API Error',
+    );
+    expect(errorEntry.context.containsKey('response'), isFalse);
+  });
+
+  test('response logging is disabled by default', () {
+    const configuration = ApiConfiguration(baseUrl: 'https://api.example.com');
+
+    expect(configuration.isLoggingOn, isFalse);
+    expect(configuration.isResponseLoggingOn, isFalse);
   });
 
   test('logs JSON and multipart payload shapes without sensitive values',

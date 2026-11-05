@@ -313,7 +313,8 @@ BackendConfiguration.supabase(
   url: '...',
   apiKey: '...',
   requestTimeout: const Duration(seconds: 30),   // per attempt
-  enableLogging: false,                          // redacted when enabled
+  enableLogging: false,                          // request/error logs
+  isResponseLoggingOn: false,                    // response bodies; opt-in
   maxRetries: 2,                                 // extra attempts; capped at 10
   retryDelay: const Duration(milliseconds: 200),
   retryBackoffMultiplier: 2.0,
@@ -927,10 +928,12 @@ final result = await BackendSdk.instance.products.getPage(
 A call already on the wire is allowed to finish; cancelling stops the next
 attempt. Attach the token to a `dispose` if you want in-flight work abandoned.
 
-Logging is off by default. When enabled, every context value is redacted before
-it reaches the sink — keys that look like credentials are replaced with
-`[redacted]` and long values are truncated, because a provider error payload can
-echo the request body.
+Logging is off by default. `isResponseLoggingOn` is also `false` by default and
+must be enabled in addition to general logging before successful response
+entries or response bodies on error entries are emitted. When logging is
+enabled, every context value is redacted before it reaches the sink — keys that
+look like credentials are replaced with `[redacted]` and long values are
+truncated, because a provider error payload can echo the request body.
 
 ```dart
 await BackendSdk.initialize(

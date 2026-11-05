@@ -11,6 +11,14 @@ class ApiConfiguration {
   final BackendLogger logger;
   final bool isLoggingOn;
 
+  /// Whether response log entries and response bodies on error logs are
+  /// emitted.
+  ///
+  /// This is opt-in even when [isLoggingOn] is enabled because response bodies
+  /// may contain more application data than request/error metadata. It
+  /// defaults to `false`.
+  final bool isResponseLoggingOn;
+
   /// Whether sensitive values are redacted before log entries are emitted.
   ///
   /// Keep this enabled outside local diagnostics. It defaults to `true` so
@@ -27,6 +35,7 @@ class ApiConfiguration {
     this.retryPolicy = RetryPolicy.noRetries,
     this.logger = const NoopBackendLogger(),
     this.isLoggingOn = false,
+    this.isResponseLoggingOn = false,
     this.redactSensitiveLogs = true,
     this.defaultHeaders = const {},
   });

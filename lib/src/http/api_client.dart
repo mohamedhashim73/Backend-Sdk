@@ -452,7 +452,7 @@ class ApiClient {
   }
 
   void _logResponse(ApiRequest request, int? statusCode, Object? responseBody) {
-    if (!_shouldLog(request)) return;
+    if (!_shouldLogResponse(request)) return;
     _logger.info(
       '✅ API Response',
       context: {
@@ -475,13 +475,16 @@ class ApiClient {
         'statusCode': dioError?.response?.statusCode,
         'type': dioError?.type.name ?? error.runtimeType.toString(),
         'message': dioError?.message ?? error.toString(),
-        'response': dioError?.response?.data,
+        if (_shouldLogResponse(request)) 'response': dioError?.response?.data,
       },
     );
   }
 
   bool _shouldLog(ApiRequest request) =>
       configuration.isLoggingOn || request.enableLogging;
+
+  bool _shouldLogResponse(ApiRequest request) =>
+      configuration.isResponseLoggingOn && _shouldLog(request);
 
   Uri _urlFor(ApiRequest request) {
     final path = Uri.parse(request.path);
