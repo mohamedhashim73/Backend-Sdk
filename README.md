@@ -313,8 +313,7 @@ BackendConfiguration.supabase(
   url: '...',
   apiKey: '...',
   requestTimeout: const Duration(seconds: 30),   // per attempt
-  enableLogging: false,                          // request/error logs
-  isResponseLoggingOn: false,                    // response bodies; opt-in
+  enableLogging: false,                          // SDK logs; off by default
   maxRetries: 2,                                 // extra attempts; capped at 10
   retryDelay: const Duration(milliseconds: 200),
   retryBackoffMultiplier: 2.0,
@@ -934,6 +933,18 @@ entries or response bodies on error entries are emitted. When logging is
 enabled, every context value is redacted before it reaches the sink — keys that
 look like credentials are replaced with `[redacted]` and long values are
 truncated, because a provider error payload can echo the request body.
+
+For the REST client, enable response logging explicitly on `ApiConfiguration`:
+
+```dart
+final client = ApiClient(
+  configuration: const ApiConfiguration(
+    baseUrl: 'https://api.example.com',
+    isLoggingOn: true,
+    isResponseLoggingOn: true,
+  ),
+);
+```
 
 ```dart
 await BackendSdk.initialize(
