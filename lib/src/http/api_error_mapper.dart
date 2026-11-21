@@ -3,12 +3,18 @@ import 'package:dio/dio.dart';
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
 import '../errors/backend_failure.dart';
+import 'api_error_language.dart';
+import 'api_error_localizer.dart';
 
 /// Converts Dio transport failures into the SDK's provider-neutral error type.
 class ApiErrorMapper {
   const ApiErrorMapper._();
 
-  static BackendFailure fromDio(DioException error, StackTrace stackTrace) {
+  static BackendFailure fromDio(
+    DioException error,
+    StackTrace stackTrace, {
+    ApiErrorLanguage language = ApiErrorLanguage.en,
+  }) {
     final statusCode = error.response?.statusCode;
     final type = switch (error.type) {
       DioExceptionType.connectionTimeout ||
@@ -31,7 +37,7 @@ class ApiErrorMapper {
     };
 
     final message = _message(error.response?.data, error.message);
-    return BackendErrorClassifier.build(
+    final failure = BackendErrorClassifier.build(
       type: type,
       message: message,
       // Validation messages describe the field the caller can correct. Unlike
@@ -41,6 +47,7 @@ class ApiErrorMapper {
       cause: error,
       stackTrace: stackTrace,
     );
+    return ApiErrorLocalizer.localize(failure, language);
   }
 
   static String _message(Object? data, String? fallback) {

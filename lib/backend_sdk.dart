@@ -96,6 +96,7 @@ export 'src/filters/filter_operator.dart';
 export 'src/filters/sort_condition.dart';
 export 'src/http/api_client.dart';
 export 'src/http/api_configuration.dart';
+export 'src/http/api_error_language.dart';
 export 'src/http/api_error_mapper.dart';
 export 'src/http/api_method.dart';
 export 'src/http/api_request.dart';

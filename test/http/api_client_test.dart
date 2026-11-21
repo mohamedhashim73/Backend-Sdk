@@ -206,6 +206,46 @@ void main() {
 
     expect(configuration.isLoggingOn, isFalse);
     expect(configuration.isResponseLoggingOn, isFalse);
+    expect(configuration.errorLanguage, ApiErrorLanguage.en);
+  });
+
+  test('returns API failures in the configured language', () async {
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.reject(
+            DioException(
+              requestOptions: options,
+              response: Response<Object?>(
+                requestOptions: options,
+                statusCode: 401,
+                data: <String, Object?>{
+                  'message': 'Invalid login credentials',
+                },
+              ),
+              type: DioExceptionType.badResponse,
+            ),
+          ),
+        ),
+      );
+    final client = ApiClient(
+      configuration: const ApiConfiguration(
+        baseUrl: 'https://api.example.com',
+        errorLanguage: ApiErrorLanguage.ar,
+      ),
+      dio: dio,
+    );
+
+    final result = await client.get<void>(
+      path: '/auth/login',
+      requiresAuthentication: false,
+    );
+
+    expect(result.failure?.message, 'Invalid login credentials');
+    expect(
+      result.failure?.safeMessage,
+      'انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.',
+    );
   });
 
   test('logs JSON and multipart payload shapes without sensitive values',

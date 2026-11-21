@@ -942,9 +942,15 @@ final client = ApiClient(
     baseUrl: 'https://api.example.com',
     isLoggingOn: true,
     isResponseLoggingOn: true,
+    errorLanguage: ApiErrorLanguage.en, // default; use .ar for Arabic
   ),
 );
 ```
+
+`errorLanguage` controls the user-facing `BackendFailure.safeMessage` returned
+by `ApiClient`. It supports `ApiErrorLanguage.en` and
+`ApiErrorLanguage.ar`, and defaults to English. Technical failure details such
+as `message`, status codes and provider codes remain available for diagnostics.
 
 ```dart
 await BackendSdk.initialize(

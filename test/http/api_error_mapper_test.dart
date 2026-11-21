@@ -26,4 +26,24 @@ void main() {
     expect(failure.message, 'The image field must be an image.');
     expect(failure.safeMessage, 'The image field must be an image.');
   });
+
+  test('localizes the safe message to Arabic while preserving diagnostics', () {
+    final failure = ApiErrorMapper.fromDio(
+      DioException(
+        requestOptions: RequestOptions(path: '/auth/login'),
+        response: Response<Object?>(
+          requestOptions: RequestOptions(path: '/auth/login'),
+          statusCode: 401,
+          data: <String, Object?>{'message': 'Invalid login credentials'},
+        ),
+        type: DioExceptionType.badResponse,
+      ),
+      StackTrace.current,
+      language: ApiErrorLanguage.ar,
+    );
+
+    expect(failure.type, BackendErrorType.unauthorized);
+    expect(failure.message, 'Invalid login credentials');
+    expect(failure.safeMessage, 'انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.');
+  });
 }

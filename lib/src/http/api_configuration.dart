@@ -1,5 +1,7 @@
 import '../core/backend_logger.dart';
+import '../errors/backend_failure.dart';
 import '../retry/retry_policy.dart';
+import 'api_error_language.dart';
 
 /// Transport configuration for the SDK REST client.
 class ApiConfiguration {
@@ -19,6 +21,12 @@ class ApiConfiguration {
   /// defaults to `false`.
   final bool isResponseLoggingOn;
 
+  /// Language used for the user-facing [BackendFailure.safeMessage] returned
+  /// by the REST client.
+  ///
+  /// Defaults to English. Technical failure details remain unchanged.
+  final ApiErrorLanguage errorLanguage;
+
   /// Whether sensitive values are redacted before log entries are emitted.
   ///
   /// Keep this enabled outside local diagnostics. It defaults to `true` so
@@ -36,6 +44,7 @@ class ApiConfiguration {
     this.logger = const NoopBackendLogger(),
     this.isLoggingOn = false,
     this.isResponseLoggingOn = false,
+    this.errorLanguage = ApiErrorLanguage.en,
     this.redactSensitiveLogs = true,
     this.defaultHeaders = const {},
   });

@@ -6,10 +6,12 @@ import 'package:dio/dio.dart';
 import '../core/backend_logger.dart';
 import '../errors/backend_error_mapper.dart';
 import '../errors/backend_error_type.dart';
+import '../errors/backend_failure.dart';
 import '../result/backend_result.dart';
 import '../retry/backend_request.dart';
 import '../retry/request_executor.dart';
 import 'api_configuration.dart';
+import 'api_error_localizer.dart';
 import 'api_error_mapper.dart';
 import 'api_method.dart';
 import 'api_request.dart';
@@ -207,7 +209,7 @@ class ApiClient {
       _logError(request, error);
       if (!_shouldRefresh(request, error)) {
         return BackendFailureResult<ApiResponse<T>>(
-          error: ApiErrorMapper.fromDio(error, stackTrace),
+          error: _localizedFailure(ApiErrorMapper.fromDio(error, stackTrace)),
         );
       }
 
@@ -216,7 +218,9 @@ class ApiClient {
       if (tokens == null) {
         await _expireSession(accessToken);
         return BackendFailureResult<ApiResponse<T>>(
-          error: refreshed.failure ?? ApiErrorMapper.fromDio(error, stackTrace),
+          error: _localizedFailure(
+            refreshed.failure ?? ApiErrorMapper.fromDio(error, stackTrace),
+          ),
         );
       }
 
@@ -233,25 +237,31 @@ class ApiClient {
         _logError(request, retryError);
         await _expireSession(tokens.accessToken);
         return BackendFailureResult<ApiResponse<T>>(
-          error: ApiErrorMapper.fromDio(retryError, retryStackTrace),
+          error: _localizedFailure(
+            ApiErrorMapper.fromDio(retryError, retryStackTrace),
+          ),
         );
       } on Object catch (retryError, retryStackTrace) {
         _logError(request, retryError);
         return BackendFailureResult<ApiResponse<T>>(
-          error: BackendErrorClassifier.fromException(
-            retryError,
-            retryStackTrace,
-            fallbackType: BackendErrorType.validation,
+          error: _localizedFailure(
+            BackendErrorClassifier.fromException(
+              retryError,
+              retryStackTrace,
+              fallbackType: BackendErrorType.validation,
+            ),
           ),
         );
       }
     } on Object catch (error, stackTrace) {
       _logError(request, error);
       return BackendFailureResult<ApiResponse<T>>(
-        error: BackendErrorClassifier.fromException(
-          error,
-          stackTrace,
-          fallbackType: BackendErrorType.validation,
+        error: _localizedFailure(
+          BackendErrorClassifier.fromException(
+            error,
+            stackTrace,
+            fallbackType: BackendErrorType.validation,
+          ),
         ),
       );
     }
@@ -338,10 +348,12 @@ class ApiClient {
     final session = this.session;
     if (session == null) {
       return BackendFailureResult<ApiSessionTokens>(
-        error: BackendErrorClassifier.build(
-          type: BackendErrorType.configuration,
-          message:
-              'API session refresh was requested without a session configuration.',
+        error: _localizedFailure(
+          BackendErrorClassifier.build(
+            type: BackendErrorType.configuration,
+            message:
+                'API session refresh was requested without a session configuration.',
+          ),
         ),
       );
     }
@@ -349,9 +361,11 @@ class ApiClient {
     final refreshToken = await session.refreshTokenProvider();
     if (refreshToken?.trim().isEmpty ?? true) {
       return BackendFailureResult<ApiSessionTokens>(
-        error: BackendErrorClassifier.build(
-          type: BackendErrorType.unauthorized,
-          message: 'No refresh token is available.',
+        error: _localizedFailure(
+          BackendErrorClassifier.build(
+            type: BackendErrorType.unauthorized,
+            message: 'No refresh token is available.',
+          ),
         ),
       );
     }
@@ -371,9 +385,11 @@ class ApiClient {
       final tokens = _tokensFrom(response.data);
       if (tokens == null) {
         return BackendFailureResult<ApiSessionTokens>(
-          error: BackendErrorClassifier.build(
-            type: BackendErrorType.unauthorized,
-            message: 'The refresh endpoint did not return an access token.',
+          error: _localizedFailure(
+            BackendErrorClassifier.build(
+              type: BackendErrorType.unauthorized,
+              message: 'The refresh endpoint did not return an access token.',
+            ),
           ),
         );
       }
@@ -381,17 +397,23 @@ class ApiClient {
       return BackendSuccess<ApiSessionTokens>(tokens);
     } on DioException catch (error, stackTrace) {
       return BackendFailureResult<ApiSessionTokens>(
-        error: ApiErrorMapper.fromDio(error, stackTrace),
+        error: _localizedFailure(ApiErrorMapper.fromDio(error, stackTrace)),
       );
     } on Object catch (error, stackTrace) {
       return BackendFailureResult<ApiSessionTokens>(
-        error: BackendErrorClassifier.fromException(
-          error,
-          stackTrace,
-          fallbackType: BackendErrorType.unauthorized,
+        error: _localizedFailure(
+          BackendErrorClassifier.fromException(
+            error,
+            stackTrace,
+            fallbackType: BackendErrorType.unauthorized,
+          ),
         ),
       );
     }
+  }
+
+  BackendFailure _localizedFailure(BackendFailure failure) {
+    return ApiErrorLocalizer.localize(failure, configuration.errorLanguage);
   }
 
   ApiSessionTokens? _tokensFrom(Object? body) {
